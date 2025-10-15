@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+
+{% block title %}Cấu Hình Hệ Thống - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-cogs"></i> Cấu Hình Hệ Thống</h4>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="configTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button">
+                            <i class="fas fa-sliders-h"></i> Cấu Hình Chung
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="price-tab" data-bs-toggle="tab" data-bs-target="#price" type="button">
+                            <i class="fas fa-money-bill-wave"></i> Giá Phí
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button">
+                            <i class="fas fa-users"></i> Quản Lý Người Dùng
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="slots-tab" data-bs-toggle="tab" data-bs-target="#slots" type="button">
+                            <i class="fas fa-parking"></i> Quản Lý Chỗ Đỗ
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="devices-tab" data-bs-toggle="tab" data-bs-target="#devices" type="button">
+                            <i class="fas fa-camera"></i> Quản Lý Thiết Bị
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content mt-3" id="configTabsContent">
+                    <!-- General Configuration Tab -->
+                    <div class="tab-pane fade show active" id="general" role="tabpanel">
+                        <form method="POST" action="{{ url_for('configure_system') }}">
+                            <input type="hidden" name="general_config" value="1">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="parking_lot_name" class="form-label">Tên bãi xe *</label>
+                                        <input type="text" class="form-control" id="parking_lot_name" name="parking_lot_name" 
+                                               value="{{ config.name if config else 'Bãi xe Trung tâm' }}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="address" class="form-label">Địa chỉ</label>
+                                        <input type="text" class="form-control" id="address" name="address" 
+                                               value="{{ config.address if config and config.address else '' }}" 
+                                               placeholder="Nhập địa chỉ bãi xe">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="managing_agency" class="form-label">Cơ quan quản lý</label>
+                                        <input type="text" class="form-control" id="managing_agency" name="managing_agency" 
+                                               value="{{ config.managing_agency if config and config.managing_agency else '' }}" 
+                                               placeholder="Nhập cơ quan quản lý">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="slots" class="form-label">Số chỗ *</label>
+                                        <input type="number" class="form-control" id="slots" name="slots" 
+                                               value="{{ config.total_slots if config else 100 }}" min="1" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="alert alert-info">
+                                        <h6><i class="fas fa-info-circle"></i> Thông tin cấu hình chung</h6>
+                                        <p class="mb-0">Cấu hình các thông tin cơ bản của hệ thống bãi xe.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Lưu Cấu Hình Chung
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Price Configuration Tab -->
+                    <div class="tab-pane fade" id="price" role="tabpanel">
+                        <form method="POST" action="{{ url_for('configure_system') }}">
+                            <input type="hidden" name="price_config" value="1">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="price_per_hour" class="form-label">Giá mỗi giờ (VNĐ) *</label>
+                                        <input type="number" class="form-control" id="price_per_hour" name="price_per_hour" 
+                                               value="{{ config.price_per_hour if config else 5000 }}" min="0" step="1000" required>
+                                        <small class="form-text text-muted">Giá thuê theo giờ cho dịch vụ gửi xe</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="alert alert-info">
+                                        <h6><i class="fas fa-info-circle"></i> Cấu hình giá phí</h6>
+                                        <p class="mb-0">Đặt giá thuê theo giờ cho dịch vụ gửi xe.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Lưu Giá Phí
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Users Management Tab -->
+                    <div class="tab-pane fade" id="users" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Danh sách Người Dùng</h5>
+                            <span class="badge bg-primary">{{ users|length }} người dùng</span>
+                        </div>
+                        {% if users %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Tên đăng nhập</th>
+                                        <th>Vai trò</th>
+                                        <th>Họ tên</th>
+                                        <th>Số điện thoại</th>
+                                        <th>Email</th>
+                                        <th>Số dư</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in users %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ user.username }}</strong>
+                                            {% if user.user_id == session.user_id %}
+                                            <span class="badge bg-success">Bạn</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ 'danger' if user.role == 'admin' else 'warning' if user.role == 'operator' else 'info' }}">
+                                                {{ user.role }}
+                                            </span>
+                                        </td>
+                                        <td>{{ user.full_name or 'N/A' }}</td>
+                                        <td>{{ user.phone or 'N/A' }}</td>
+                                        <td>{{ user.email or 'N/A' }}</td>
+                                        <td><strong>{{ "%.0f"|format(user.balance) }} VND</strong></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Chưa có người dùng nào.
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Parking Slots Management Tab -->
+                    <div class="tab-pane fade" id="slots" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="fas fa-plus"></i> Thêm Chỗ Đỗ Mới</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <form method="POST" action="{{ url_for('add_parking_slot') }}">
+                                            <div class="mb-3">
+                                                <label for="slot_number" class="form-label">Số chỗ đỗ *</label>
+                                                <input type="text" class="form-control" id="slot_number" name="slot_number" 
+                                                       placeholder="VD: A001, B002" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="slot_status" class="form-label">Trạng thái *</label>
+                                                <select class="form-control" id="slot_status" name="slot_status" required>
+                                                    <option value="available">Có sẵn</option>
+                                                    <option value="occupied">Đã có xe</option>
+                                                    <option value="reserved">Đã đặt trước</option>
+                                                    <option value="maintenance">Bảo trì</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="slot_location" class="form-label">Vị trí</label>
+                                                <input type="text" class="form-control" id="slot_location" name="slot_location" 
+                                                       placeholder="VD: Tầng 1, Khu A">
+                                            </div>
+                                            <button type="submit" class="btn btn-primary w-100">
+                                                <i class="fas fa-plus"></i> Thêm Chỗ Đỗ
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Danh sách Chỗ Đỗ</h5>
+                                    <span class="badge bg-primary">{{ slots|length }} chỗ đỗ</span>
+                                </div>
+                                {% if slots %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Số chỗ</th>
+                                                <th>Trạng thái</th>
+                                                <th>Vị trí</th>
+                                                <th>Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for slot in slots %}
+                                            <tr>
+                                                <td><strong>{{ slot.slot_number }}</strong></td>
+                                                <td>
+                                                    <span class="badge bg-{{ 
+                                                        'success' if slot.status == 'available' 
+                                                        else 'warning' if slot.status == 'occupied' 
+                                                        else 'info' if slot.status == 'reserved'
+                                                        else 'secondary' 
+                                                    }}">
+                                                        {{ 
+                                                            'Có sẵn' if slot.status == 'available'
+                                                            else 'Đã có xe' if slot.status == 'occupied'
+                                                            else 'Đã đặt' if slot.status == 'reserved'
+                                                            else 'Bảo trì'
+                                                        }}
+                                                    </span>
+                                                </td>
+                                                <td>{{ slot.location or 'Chưa xác định' }}</td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-outline-primary" 
+                                                                onclick="editSlot('{{ slot.slot_id }}', '{{ slot.slot_number }}', '{{ slot.status }}', '{{ slot.location or '' }}')">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <form method="POST" action="{{ url_for('delete_parking_slot', slot_id=slot.slot_id) }}" 
+                                                              style="display: inline;" 
+                                                              onsubmit="return confirm('Bạn có chắc muốn xóa chỗ đỗ {{ slot.slot_number }}?');">
+                                                            <button type="submit" class="btn btn-outline-danger">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> Chưa có chỗ đỗ nào.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Devices Management Tab -->
+                    <div class="tab-pane fade" id="devices" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="fas fa-plus"></i> Thêm Thiết Bị Mới</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <form method="POST" action="{{ url_for('add_device') }}">
+                                            <div class="mb-3">
+                                                <label for="device_type" class="form-label">Loại thiết bị *</label>
+                                                <select class="form-control" id="device_type" name="device_type" required>
+                                                    <option value="camera">Camera ANPR</option>
+                                                    <option value="barrier">Barrier</option>
+                                                    <option value="rfid_reader">Đầu đọc RFID</option>
+                                                    <option value="payment_terminal">Máy thanh toán</option>
+                                                    <option value="sensor">Cảm biến</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="device_status" class="form-label">Trạng thái *</label>
+                                                <select class="form-control" id="device_status" name="device_status" required>
+                                                    <option value="active">Hoạt động</option>
+                                                    <option value="inactive">Ngừng hoạt động</option>
+                                                    <option value="maintenance">Bảo trì</option>
+                                                    <option value="error">Lỗi</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="device_location" class="form-label">Vị trí *</label>
+                                                <select class="form-control" id="device_location" name="device_location" required>
+                                                    <option value="entry_gate">Cổng vào</option>
+                                                    <option value="exit_gate">Cổng ra</option>
+                                                    <option value="parking_area">Khu vực gửi xe</option>
+                                                    <option value="payment_zone">Khu thanh toán</option>
+                                                    <option value="security_office">Phòng bảo vệ</option>
+                                                    <option value="other">Khác</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="device_description" class="form-label">Mô tả</label>
+                                                <textarea class="form-control" id="device_description" name="device_description" 
+                                                          rows="2" placeholder="Mô tả thiết bị..."></textarea>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary w-100">
+                                                <i class="fas fa-plus"></i> Thêm Thiết Bị
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Danh sách Thiết Bị</h5>
+                                    <span class="badge bg-primary">{{ devices|length }} thiết bị</span>
+                                </div>
+                                {% if devices %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Loại thiết bị</th>
+                                                <th>Trạng thái</th>
+                                                <th>Vị trí</th>
+                                                <th>Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for device in devices %}
+                                            <tr>
+                                                <td>
+                                                    <span class="badge bg-info">
+                                                        {% if device.device_type == 'camera' %}
+                                                            <i class="fas fa-camera"></i> Camera
+                                                        {% elif device.device_type == 'barrier' %}
+                                                            <i class="fas fa-bars"></i> Barrier
+                                                        {% elif device.device_type == 'rfid_reader' %}
+                                                            <i class="fas fa-id-card"></i> RFID Reader
+                                                        {% elif device.device_type == 'payment_terminal' %}
+                                                            <i class="fas fa-credit-card"></i> Payment Terminal
+                                                        {% else %}
+                                                            <i class="fas fa-sensor"></i> Sensor
+                                                        {% endif %}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-{{ 
+                                                        'success' if device.device_status == 'active' 
+                                                        else 'secondary' if device.device_status == 'inactive'
+                                                        else 'warning' if device.device_status == 'maintenance'
+                                                        else 'danger'
+                                                    }}">
+                                                        {{ 
+                                                            'Hoạt động' if device.device_status == 'active'
+                                                            else 'Ngừng hoạt động' if device.device_status == 'inactive'
+                                                            else 'Bảo trì' if device.device_status == 'maintenance'
+                                                            else 'Lỗi'
+                                                        }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {% if device.location == 'entry_gate' %}
+                                                        <i class="fas fa-sign-in-alt"></i> Cổng vào
+                                                    {% elif device.location == 'exit_gate' %}
+                                                        <i class="fas fa-sign-out-alt"></i> Cổng ra
+                                                    {% elif device.location == 'parking_area' %}
+                                                        <i class="fas fa-parking"></i> Khu gửi xe
+                                                    {% elif device.location == 'payment_zone' %}
+                                                        <i class="fas fa-cash-register"></i> Khu thanh toán
+                                                    {% elif device.location == 'security_office' %}
+                                                        <i class="fas fa-shield-alt"></i> Phòng bảo vệ
+                                                    {% else %}
+                                                        <i class="fas fa-map-marker-alt"></i> Khác
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-outline-primary" 
+                                                                onclick="editDevice('{{ device.device_id }}', '{{ device.device_type }}', '{{ device.device_status }}', '{{ device.location }}')">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <form method="POST" action="{{ url_for('delete_device', device_id=device.device_id) }}" 
+                                                              style="display: inline;" 
+                                                              onsubmit="return confirm('Bạn có chắc muốn xóa thiết bị này?');">
+                                                            <button type="submit" class="btn btn-outline-danger">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> Chưa có thiết bị nào.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Slot Modal -->
+<div class="modal fade" id="editSlotModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Chỉnh sửa Chỗ Đỗ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editSlotForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_slot_number" class="form-label">Số chỗ đỗ *</label>
+                        <input type="text" class="form-control" id="edit_slot_number" name="slot_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_slot_status" class="form-label">Trạng thái *</label>
+                        <select class="form-control" id="edit_slot_status" name="slot_status" required>
+                            <option value="available">Có sẵn</option>
+                            <option value="occupied">Đã có xe</option>
+                            <option value="reserved">Đã đặt trước</option>
+                            <option value="maintenance">Bảo trì</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_slot_location" class="form-label">Vị trí</label>
+                        <input type="text" class="form-control" id="edit_slot_location" name="slot_location">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Cập nhật</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Device Modal -->
+<div class="modal fade" id="editDeviceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Chỉnh sửa Thiết Bị</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editDeviceForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_device_type" class="form-label">Loại thiết bị *</label>
+                        <select class="form-control" id="edit_device_type" name="device_type" required>
+                            <option value="camera">Camera ANPR</option>
+                            <option value="barrier">Barrier</option>
+                            <option value="rfid_reader">Đầu đọc RFID</option>
+                            <option value="payment_terminal">Máy thanh toán</option>
+                            <option value="sensor">Cảm biến</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_device_status" class="form-label">Trạng thái *</label>
+                        <select class="form-control" id="edit_device_status" name="device_status" required>
+                            <option value="active">Hoạt động</option>
+                            <option value="inactive">Ngừng hoạt động</option>
+                            <option value="maintenance">Bảo trì</option>
+                            <option value="error">Lỗi</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_device_location" class="form-label">Vị trí *</label>
+                        <select class="form-control" id="edit_device_location" name="device_location" required>
+                            <option value="entry_gate">Cổng vào</option>
+                            <option value="exit_gate">Cổng ra</option>
+                            <option value="parking_area">Khu vực gửi xe</option>
+                            <option value="payment_zone">Khu thanh toán</option>
+                            <option value="security_office">Phòng bảo vệ</option>
+                            <option value="other">Khác</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Cập nhật</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editSlot(slotId, slotNumber, status, location) {
+    document.getElementById('edit_slot_number').value = slotNumber;
+    document.getElementById('edit_slot_status').value = status;
+    document.getElementById('edit_slot_location').value = location || '';
+    
+    // Update form action
+    document.getElementById('editSlotForm').action = `/edit_parking_slot/${slotId}`;
+    
+    // Show modal
+    new bootstrap.Modal(document.getElementById('editSlotModal')).show();
+}
+
+function editDevice(deviceId, deviceType, deviceStatus, deviceLocation) {
+    document.getElementById('edit_device_type').value = deviceType;
+    document.getElementById('edit_device_status').value = deviceStatus;
+    document.getElementById('edit_device_location').value = deviceLocation;
+    
+    // Update form action
+    document.getElementById('editDeviceForm').action = `/edit_device/${deviceId}`;
+    
+    // Show modal
+    new bootstrap.Modal(document.getElementById('editDeviceModal')).show();
+}
+
+// Tab persistence
+document.addEventListener('DOMContentLoaded', function() {
+    const activeTab = localStorage.getItem('activeConfigTab');
+    if (activeTab) {
+        const tab = document.querySelector(`[data-bs-target="${activeTab}"]`);
+        if (tab) {
+            new bootstrap.Tab(tab).show();
+        }
+    }
+
+    // Save active tab
+    const tabTriggers = document.querySelectorAll('#configTabs [data-bs-toggle="tab"]');
+    tabTriggers.forEach(trigger => {
+        trigger.addEventListener('click', function() {
+            localStorage.setItem('activeConfigTab', this.getAttribute('data-bs-target'));
+        });
+    });
+});
+</script>
+{% endblock %}

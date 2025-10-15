@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Trang Chủ - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="intro-container">
+            <div class="intro-title">Chào Mừng Đến Với {{ name }}</div>
+            <div class="intro-text">
+                Hệ thống quản lý bãi đỗ xe thông minh, tích hợp nhận diện biển số (ANPR) và thanh toán VNPay. 
+                Đăng ký ngay để trải nghiệm dịch vụ tiện lợi, nhanh chóng và an toàn!
+            </div>
+            <div class="intro-card-container">
+                <div class="intro-card">
+                    <div class="intro-card-title">Tên Bãi Xe</div>
+                    <div class="intro-card-value">{{ name }}</div>
+                </div>
+                <div class="intro-card">
+                    <div class="intro-card-title">Địa Chỉ</div>
+                    <div class="intro-card-value">{{ address }}</div>
+                </div>
+                <div class="intro-card">
+                    <div class="intro-card-title">Cơ Quan Quản Lý</div>
+                    <div class="intro-card-value">{{ managing_agency }}</div>
+                </div>
+                <div class="intro-card">
+                    <div class="intro-card-title">Sức Chứa</div>
+                    <div class="intro-card-value">{{ total_slots }} chỗ</div>
+                </div>
+                <div class="intro-card">
+                    <div class="intro-card-title">Giá Gửi Xe</div>
+                    <div class="intro-card-value">{{ "%.0f"|format(price_per_hour) }} VND/giờ</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="stat-box text-center">
+            <div class="stat-title">Số chỗ trống</div>
+            <div class="stat-value">{{ available_slots }}</div>
+            <div class="stat-update">Cập nhật mỗi 5s ⟳</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-box text-center">
+            <div class="stat-title">Số xe đang gửi</div>
+            <div class="stat-value">{{ occupied_slots }}</div>
+            <div class="stat-update">Cập nhật mỗi 5s ⟳</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-box text-center">
+            <div class="stat-title">Tổng số chỗ</div>
+            <div class="stat-value">{{ total_slots }}</div>
+            <div class="stat-update">Cập nhật mỗi 5s ⟳</div>
+        </div>
+    </div>
+</div>
+
+{% if available_slots == 0 %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-warning text-center">
+            <strong>Bãi xe đã đầy!</strong> Vui lòng quay lại sau.
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not session.user_id %}
+<div class="row mt-4">
+    <div class="col-12 text-center">
+        <div class="auth-buttons">
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg me-3">
+                <i class="fas fa-sign-in-alt"></i> Đăng Nhập
+            </a>
+            <a href="{{ url_for('register') }}" class="btn btn-outline-primary btn-lg">
+                <i class="fas fa-user-plus"></i> Đăng Ký
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto refresh stats every 5 seconds
+setTimeout(function() {
+    window.location.reload();
+}, 5000);
+</script>
+{% endblock %}

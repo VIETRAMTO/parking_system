@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Thêm Phương Tiện - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-plus"></i> Thêm Phương tiện Mới</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_vehicle') }}">
+                    <div class="mb-3">
+                        <label for="license_plate" class="form-label">Biển số xe *</label>
+                        <input type="text" class="form-control" id="license_plate" name="license_plate" 
+                               placeholder="VD: 51A-123.45" required pattern="\d{2}[A-Z]-\d{3}\.\d{2}">
+                        <small class="form-text text-muted">Định dạng: XXA-XXX.XX</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="vehicle_type" class="form-label">Loại xe *</label>
+                        <select class="form-control" id="vehicle_type" name="vehicle_type" required>
+                            <option value="sedan">Sedan</option>
+                            <option value="suv">SUV</option>
+                            <option value="truck">Truck</option>
+                            <option value="other">Khác</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="owner_username" class="form-label">Tên chủ xe</label>
+                        <input type="text" class="form-control" id="owner_username" name="owner_username" 
+                               placeholder="Nhập tên đăng nhập chủ xe">
+                        <small class="form-text text-muted">Để trống nếu chưa có chủ xe</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save"></i> Thêm Phương tiện
+                        </button>
+                        <a href="{{ url_for('manage_vehicles') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Quay lại
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

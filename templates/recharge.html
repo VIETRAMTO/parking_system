@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Nạp Tiền - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-wallet"></i> Nạp Tiền Tài Khoản</h4>
+            </div>
+            <div class="card-body">
+                <div class="balance-display mb-4 text-center">
+                    <h5>Số dư hiện tại</h5>
+                    <h3 class="text-primary">{{ "%.0f"|format(current_balance) }} VND</h3>
+                </div>
+                
+                <form method="POST" action="{{ url_for('recharge') }}">
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Số tiền nạp (VNĐ)</label>
+                        <input type="number" class="form-control" id="amount" name="amount" 
+                               min="10000" step="1000" value="10000" required>
+                        <small class="form-text text-muted">Số tiền tối thiểu: 10,000 VND</small>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-credit-card"></i> Thanh toán qua VNPAY
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-history"></i> Lịch sử Giao dịch</h4>
+            </div>
+            <div class="card-body">
+                {% if transactions %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Số tiền</th>
+                                <th>Phương thức</th>
+                                <th>Thời gian</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trans in transactions %}
+                            <tr>
+                                <td>{{ "%.0f"|format(trans.amount) }} VND</td>
+                                <td>{{ trans.payment_method }}</td>
+                                <td>
+                                    {% if trans.transaction_time is string %}
+                                        {{ trans.transaction_time[:16]|replace('T', ' ') }}
+                                    {% else %}
+                                        {{ trans.transaction_time.strftime('%d/%m/%Y %H:%M') }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if trans.status == 'completed' else 'warning' if trans.status == 'pending' else 'danger' }}">
+                                        {{ trans.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center text-muted">Chưa có giao dịch nào.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

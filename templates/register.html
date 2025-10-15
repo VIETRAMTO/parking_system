@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Đăng Ký - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-user-plus"></i> Đăng Ký Tài Khoản</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('register') }}">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Tên đăng nhập *</label>
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       placeholder="Nhập tên đăng nhập" required minlength="4">
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Mật khẩu *</label>
+                                <input type="password" class="form-control" id="password" name="password" 
+                                       placeholder="Nhập mật khẩu" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="full_name" class="form-label">Họ và tên *</label>
+                                <input type="text" class="form-control" id="full_name" name="full_name" 
+                                       placeholder="Nhập họ và tên" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">Số điện thoại *</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" 
+                                       placeholder="Nhập số điện thoại" required pattern="[0-9]{10,11}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       placeholder="Nhập email (tùy chọn)">
+                            </div>
+                            <div class="mb-3">
+                                <label for="role" class="form-label">Vai trò *</label>
+                                <select class="form-control" id="role" name="role" required>
+                                    <option value="customer">Khách hàng</option>
+                                    <option value="admin">Quản trị viên</option>
+                                    <option value="operator">Nhân viên vận hành</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="adminCodeField" style="display: none;">
+                                <label for="admin_code" class="form-label">Mã admin *</label>
+                                <input type="password" class="form-control" id="admin_code" name="admin_code" 
+                                       placeholder="Nhập mã admin để đăng ký vai trò admin">
+                            </div>
+                            <div class="mb-3">
+                                <label for="license_plate" class="form-label">Biển số xe</label>
+                                <input type="text" class="form-control" id="license_plate" name="license_plate" 
+                                       placeholder="VD: 51A-123.45" pattern="\d{2}[A-Z]-\d{3}\.\d{2}">
+                                <small class="form-text text-muted">Định dạng: XXA-XXX.XX</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="vehicle_type" class="form-label">Loại xe</label>
+                                <select class="form-control" id="vehicle_type" name="vehicle_type">
+                                    <option value="sedan">Sedan</option>
+                                    <option value="suv">SUV</option>
+                                    <option value="truck">Truck</option>
+                                    <option value="other">Khác</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus"></i> Đăng ký
+                        </button>
+                    </div>
+                </form>
+                <div class="text-center mt-3">
+                    <p>Đã có tài khoản? <a href="{{ url_for('login') }}">Đăng nhập ngay</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('role').addEventListener('change', function() {
+    const adminCodeField = document.getElementById('adminCodeField');
+    if (this.value === 'admin') {
+        adminCodeField.style.display = 'block';
+        document.getElementById('admin_code').required = true;
+    } else {
+        adminCodeField.style.display = 'none';
+        document.getElementById('admin_code').required = false;
+    }
+});
+</script>
+{% endblock %}

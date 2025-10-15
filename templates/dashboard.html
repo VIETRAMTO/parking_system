@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard & Báo Cáo - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-chart-line"></i> Dashboard & Báo cáo</h4>
+            </div>
+            <div class="card-body">
+                <!-- Statistics -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="stat-box text-center">
+                            <div class="stat-title">Xe đang trong bãi</div>
+                            <div class="stat-value">{{ active_sessions }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-box text-center">
+                            <div class="stat-title">Tổng doanh thu</div>
+                            <div class="stat-value">{{ "%.0f"|format(total_revenue) }} VND</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-box text-center">
+                            <div class="stat-title">Doanh thu (khoảng thời gian)</div>
+                            <div class="stat-value">{{ "%.0f"|format(filtered_revenue) }} VND</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Date Filter -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Bộ lọc thời gian</h5>
+                        <form method="GET" action="{{ url_for('dashboard') }}">
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <label for="from_date" class="form-label">Từ ngày</label>
+                                    <input type="date" class="form-control" id="from_date" name="from_date" 
+                                           value="{{ from_date }}">
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="to_date" class="form-label">Đến ngày</label>
+                                    <input type="date" class="form-control" id="to_date" name="to_date" 
+                                           value="{{ to_date }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-filter"></i> Lọc
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Sessions Table -->
+                <h5 class="mb-3">Lịch sử gửi xe</h5>
+                {% if sessions_data %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Biển số xe</th>
+                                <th>Thời gian vào</th>
+                                <th>Thời gian ra</th>
+                                <th>Phí gửi xe</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in sessions_data %}
+                            <tr>
+                                <td>{{ session.license_plate }}</td>
+                                <td>
+                                    {% if session.entry_time is string %}
+                                        {{ session.entry_time[:16]|replace('T', ' ') }}
+                                    {% else %}
+                                        {{ session.entry_time.strftime('%d/%m/%Y %H:%M') }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if session.exit_time %}
+                                        {% if session.exit_time is string %}
+                                            {{ session.exit_time[:16]|replace('T', ' ') }}
+                                        {% else %}
+                                            {{ session.exit_time.strftime('%d/%m/%Y %H:%M') }}
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-warning">Đang gửi</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if session.parking_fee %}
+                                        {{ "%.0f"|format(session.parking_fee) }} VND
+                                    {% else %}
+                                        <span class="text-muted">0 VND</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if session.status == 'completed' else 'warning' }}">
+                                        {{ session.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Export Buttons -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <button class="btn btn-success w-100" onclick="exportToCSV()">
+                            <i class="fas fa-file-csv"></i> Tải báo cáo CSV
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <button class="btn btn-danger w-100" onclick="exportToPDF()">
+                            <i class="fas fa-file-pdf"></i> Tải báo cáo PDF
+                        </button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info text-center">
+                    <i class="fas fa-info-circle"></i> Không có dữ liệu phiên đỗ xe trong khoảng thời gian này.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function exportToCSV() {
+    alert('Chức năng xuất CSV sẽ được triển khai sau');
+}
+
+function exportToPDF() {
+    alert('Chức năng xuất PDF sẽ được triển khai sau');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Tài Khoản & Lịch Sử - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-user-circle"></i> Tài Khoản Cá Nhân & Lịch Sử Gửi Xe</h1>
+    </div>
+</div>
+
+<!-- User Information -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Thông Tin Tài Khoản</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <strong>Họ và tên:</strong> {{ user_info.full_name or 'Chưa cập nhật' }}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Tên đăng nhập:</strong> {{ session.username }}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Số điện thoại:</strong> {{ user_info.phone or 'Chưa cập nhật' }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <strong>Email:</strong> {{ user_info.email or 'Chưa cập nhật' }}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Số dư:</strong> {{ "%.0f"|format(user_info.balance) }} VND
+                        </div>
+                        <div class="mb-3">
+                            <strong>Biển số xe:</strong> {{ vehicle_info.license_plate if vehicle_info else 'Chưa đăng ký' }}
+                        </div>
+                        {% if vehicle_info %}
+                        <div class="mb-3">
+                            <strong>Loại xe:</strong> {{ vehicle_info.vehicle_type }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="stat-box text-center">
+            <div class="stat-title">Tổng lượt gửi xe</div>
+            <div class="stat-value">{{ total_sessions }}</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="stat-box text-center">
+            <div class="stat-title">Tổng chi phí</div>
+            <div class="stat-value">{{ "%.0f"|format(total_spent) }} VND</div>
+        </div>
+    </div>
+</div>
+
+<!-- Parking History -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-history"></i> Lịch Sử Gửi Xe</h5>
+            </div>
+            <div class="card-body">
+                {% if sessions_data %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Thời gian vào</th>
+                                <th>Thời gian ra</th>
+                                <th>Phí gửi xe</th>
+                                <th>Trạng thái</th>
+                                <th>Chỗ đỗ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in sessions_data %}
+                            <tr>
+                                <td>
+                                    {% if session.entry_time is string %}
+                                        {{ session.entry_time[:16]|replace('T', ' ') }}
+                                    {% else %}
+                                        {{ session.entry_time.strftime('%d/%m/%Y %H:%M') }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if session.exit_time %}
+                                        {% if session.exit_time is string %}
+                                            {{ session.exit_time[:16]|replace('T', ' ') }}
+                                        {% else %}
+                                            {{ session.exit_time.strftime('%d/%m/%Y %H:%M') }}
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-warning">Đang gửi</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if session.parking_fee %}
+                                        {{ "%.0f"|format(session.parking_fee) }} VND
+                                    {% else %}
+                                        <span class="text-muted">0 VND</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if session.status == 'completed' else 'warning' }}">
+                                        {{ session.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if session.slot_id %}
+                                        Slot {{ session.slot_id }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Export Button -->
+                <div class="text-center mt-3">
+                    <button class="btn btn-primary" onclick="exportHistory()">
+                        <i class="fas fa-download"></i> Tải lịch sử gửi xe (CSV)
+                    </button>
+                </div>
+                {% else %}
+                <div class="alert alert-info text-center">
+                    <i class="fas fa-info-circle"></i> Chưa có lịch sử gửi xe nào.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function exportHistory() {
+    alert('Chức năng xuất lịch sử sẽ được triển khai sau');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,640 @@
+{% extends "base.html" %}
+
+{% block title %}Xử Lý Sự Cố - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Xử lý Sự cố</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('handle_incidents') }}" enctype="multipart/form-data" id="incidentForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <!-- Webcam Capture Section -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0"><i class="fas fa-camera"></i> Chụp ảnh trực tiếp</h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    <div id="webcamContainer" class="mb-2">
+                                        <video id="webcam" width="100%" height="200" autoplay playsinline style="border-radius: 8px; background: #f8f9fa;"></video>
+                                    </div>
+                                    <button type="button" id="captureBtn" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-camera"></i> Chụp ảnh
+                                    </button>
+                                    <canvas id="canvas" style="display: none;"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="image" class="form-label">Hoặc upload ảnh biển số</label>
+                                <input type="file" class="form-control" id="image" name="image" 
+                                       accept="image/*" capture="camera">
+                                <small class="form-text text-muted">Chụp ảnh hoặc upload ảnh biển số xe gặp sự cố</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="license_plate" class="form-label">Biển số xe gặp sự cố *</label>
+                                <input type="text" class="form-control" id="license_plate" name="license_plate" 
+                                       placeholder="VD: 51A-123.45" required pattern="\d{2}[A-Z]-\d{3}\.\d{2}">
+                                <small class="form-text text-muted">Định dạng: XXA-XXX.XX</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="issue_type" class="form-label">Loại sự cố *</label>
+                                <select class="form-control" id="issue_type" name="issue_type" required>
+                                    <option value="Mất thẻ">Mất thẻ</option>
+                                    <option value="Không nhận diện được">Không nhận diện được</option>
+                                    <option value="Hỏng barrier">Hỏng barrier</option>
+                                    <option value="Lỗi thanh toán">Lỗi thanh toán</option>
+                                    <option value="Xe quá khổ">Xe quá khổ</option>
+                                    <option value="Mất vé">Mất vé</option>
+                                    <option value="Sự cố kỹ thuật">Sự cố kỹ thuật</option>
+                                    <option value="Va chạm">Va chạm</option>
+                                    <option value="Khác">Khác</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Mô tả sự cố *</label>
+                                <textarea class="form-control" id="description" name="description" 
+                                          rows="3" placeholder="Nhập mô tả chi tiết sự cố..." required></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="urgency_level" class="form-label">Mức độ khẩn cấp *</label>
+                                <select class="form-control" id="urgency_level" name="urgency_level" required>
+                                    <option value="low">Thấp</option>
+                                    <option value="medium" selected>Trung bình</option>
+                                    <option value="high">Cao</option>
+                                    <option value="critical">Rất cao</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="action_taken" class="form-label">Biện pháp xử lý *</label>
+                                <textarea class="form-control" id="action_taken" name="action_taken" 
+                                          rows="2" placeholder="Mô tả biện pháp xử lý đã thực hiện..." required></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div id="imagePreview" class="mb-3 text-center" style="display: none;">
+                                <img id="preview" src="#" alt="Preview" class="img-fluid rounded" style="max-height: 200px;">
+                                <div id="recognitionResult" class="mt-2 alert alert-info" style="display: none;"></div>
+                            </div>
+                            
+                            <!-- Real-time Information Display -->
+                            <div id="realTimeInfo">
+                                <!-- Vehicle Information Display -->
+                                <div id="vehicleInfo" class="alert alert-success" style="display: none;">
+                                    <h6><i class="fas fa-car"></i> Thông tin phương tiện:</h6>
+                                    <div id="vehicleDetails"></div>
+                                </div>
+
+                                <!-- Owner Information Display -->
+                                <div id="ownerInfo" class="alert alert-info" style="display: none;">
+                                    <h6><i class="fas fa-user"></i> Thông tin chủ xe:</h6>
+                                    <div id="ownerDetails"></div>
+                                </div>
+
+                                <!-- Session Information Display -->
+                                <div id="sessionInfo" class="alert alert-primary" style="display: none;">
+                                    <h6><i class="fas fa-history"></i> Thông tin phiên gửi xe:</h6>
+                                    <div id="sessionDetails"></div>
+                                </div>
+
+                                <!-- Cost Estimation -->
+                                <div id="costEstimation" class="alert alert-secondary" style="display: none;">
+                                    <h6><i class="fas fa-calculator"></i> Ước tính chi phí:</h6>
+                                    <div id="costDetails"></div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Actions -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0"><i class="fas fa-bolt"></i> Hành động nhanh</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <button type="button" class="btn btn-outline-primary w-100 btn-sm" onclick="quickAction('Mất thẻ')">
+                                                Mất thẻ
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button type="button" class="btn btn-outline-warning w-100 btn-sm" onclick="quickAction('Không nhận diện được')">
+                                                Lỗi nhận diện
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button type="button" class="btn btn-outline-danger w-100 btn-sm" onclick="quickAction('Hỏng barrier')">
+                                                Barrier hỏng
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button type="button" class="btn btn-outline-info w-100 btn-sm" onclick="quickAction('Lỗi thanh toán')">
+                                                Lỗi thanh toán
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-info-circle"></i> Hướng dẫn xử lý:</h6>
+                                <ul class="mb-0 small">
+                                    <li><strong>Mất thẻ:</strong> Xác nhận thông tin chủ xe và tính phí theo thời gian thực tế</li>
+                                    <li><strong>Không nhận diện được:</strong> Sử dụng chức năng nhận diện ảnh hoặc nhập thủ công</li>
+                                    <li><strong>Hỏng barrier:</strong> Liên hệ kỹ thuật và sử dụng điều khiển thủ công</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="button" class="btn btn-secondary me-md-2" onclick="resetForm()">
+                            <i class="fas fa-redo"></i> Làm mới
+                        </button>
+                        <button type="submit" class="btn btn-warning btn-lg">
+                            <i class="fas fa-check-circle"></i> Ghi nhận sự cố
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Incidents -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-list"></i> Sự cố gần đây (24h)</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Biển số</th>
+                                <th>Loại sự cố</th>
+                                <th>Mức độ</th>
+                                <th>Trạng thái</th>
+                                <th>Người xử lý</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentIncidents">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    <i class="fas fa-info-circle fa-2x mb-2"></i><br>
+                                    Chưa có sự cố nào được ghi nhận trong 24h qua
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Webcam functionality
+let webcamStream = null;
+
+async function initWebcam() {
+    try {
+        const video = document.getElementById('webcam');
+        webcamStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'environment',
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            } 
+        });
+        video.srcObject = webcamStream;
+    } catch (err) {
+        console.error('Lỗi khởi tạo webcam:', err);
+        document.getElementById('webcamContainer').innerHTML = 
+            '<div class="alert alert-warning text-center">Không thể truy cập camera. Vui lòng sử dụng chức năng upload ảnh.</div>';
+    }
+}
+
+// Capture image from webcam
+document.getElementById('captureBtn').addEventListener('click', function() {
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Convert to blob and create file
+    canvas.toBlob(function(blob) {
+        const file = new File([blob], 'captured_image.jpg', { type: 'image/jpeg' });
+        
+        // Display preview
+        const url = URL.createObjectURL(blob);
+        document.getElementById('preview').src = url;
+        document.getElementById('imagePreview').style.display = 'block';
+        
+        // Send for recognition
+        recognizeLicensePlate(file);
+        
+    }, 'image/jpeg', 0.8);
+});
+
+// File upload handling
+document.getElementById('image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('preview').src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+        
+        recognizeLicensePlate(file);
+    }
+});
+
+// License plate recognition function
+function recognizeLicensePlate(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    fetch('/recognize_license_plate', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.license_plate && data.license_plate !== "Không nhận diện được") {
+            document.getElementById('license_plate').value = data.license_plate;
+            document.getElementById('recognitionResult').innerHTML = 
+                `<strong>Biển số nhận diện:</strong> ${data.license_plate}`;
+            document.getElementById('recognitionResult').style.display = 'block';
+            document.getElementById('recognitionResult').className = 'mt-2 alert alert-info';
+            
+            // Load vehicle and owner information from database
+            loadVehicleInfo(data.license_plate);
+        } else {
+            document.getElementById('recognitionResult').innerHTML = 
+                `<strong>Không nhận diện được biển số. Vui lòng nhập thủ công.</strong>`;
+            document.getElementById('recognitionResult').style.display = 'block';
+            document.getElementById('recognitionResult').className = 'mt-2 alert alert-warning';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('recognitionResult').innerHTML = 
+            `<strong>Lỗi kết nối. Vui lòng thử lại.</strong>`;
+        document.getElementById('recognitionResult').style.display = 'block';
+        document.getElementById('recognitionResult').className = 'mt-2 alert alert-danger';
+    });
+}
+
+// License plate validation and info loading
+document.getElementById('license_plate').addEventListener('blur', function() {
+    if (this.value && this.value !== "Không nhận diện được") {
+        loadVehicleInfo(this.value);
+    }
+});
+
+// Load vehicle and owner information from database
+function loadVehicleInfo(licensePlate) {
+    // Show loading state
+    showLoadingState();
+    
+    // Fetch vehicle and owner information from backend
+    fetch(`/get_vehicle_info/${encodeURIComponent(licensePlate)}`)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Không tìm thấy thông tin xe');
+        }
+        return response.json();
+    })
+    .then(data => {
+        displayVehicleInfo(data);
+        displayOwnerInfo(data.owner_info);
+        displaySessionInfo(data.session_info);
+        if (data.session_info && data.session_info.status === 'in_progress') {
+            calculateCostEstimation(data.session_info);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        displayNoVehicleInfo(licensePlate);
+    });
+}
+
+function showLoadingState() {
+    document.getElementById('vehicleInfo').style.display = 'block';
+    document.getElementById('vehicleDetails').innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Đang tải thông tin...</p>';
+    
+    document.getElementById('ownerInfo').style.display = 'block';
+    document.getElementById('ownerDetails').innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Đang tải thông tin chủ xe...</p>';
+    
+    document.getElementById('sessionInfo').style.display = 'block';
+    document.getElementById('sessionDetails').innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Đang tải thông tin phiên gửi xe...</p>';
+}
+
+function displayVehicleInfo(data) {
+    const vehicleDetails = document.getElementById('vehicleDetails');
+    
+    if (data.vehicle_info) {
+        vehicleDetails.innerHTML = `
+            <p class="mb-1"><strong>Biển số:</strong> ${data.vehicle_info.license_plate}</p>
+            <p class="mb-1"><strong>Loại xe:</strong> ${getVehicleTypeText(data.vehicle_info.vehicle_type)}</p>
+            <p class="mb-1"><strong>Ngày đăng ký:</strong> ${formatDate(data.vehicle_info.created_at)}</p>
+        `;
+    } else {
+        vehicleDetails.innerHTML = '<p class="text-warning"><i class="fas fa-exclamation-triangle"></i> Không tìm thấy thông tin xe trong hệ thống</p>';
+    }
+}
+
+function displayOwnerInfo(ownerInfo) {
+    const ownerDetails = document.getElementById('ownerDetails');
+    
+    if (ownerInfo) {
+        ownerDetails.innerHTML = `
+            <p class="mb-1"><strong>Họ tên:</strong> ${ownerInfo.full_name || 'Chưa cập nhật'}</p>
+            <p class="mb-1"><strong>Số điện thoại:</strong> ${ownerInfo.phone || 'Chưa cập nhật'}</p>
+            <p class="mb-1"><strong>Email:</strong> ${ownerInfo.email || 'Chưa cập nhật'}</p>
+            <p class="mb-1"><strong>Tài khoản:</strong> ${ownerInfo.username}</p>
+            <p class="mb-1"><strong>Số dư:</strong> ${formatCurrency(ownerInfo.balance || 0)}</p>
+        `;
+    } else {
+        ownerDetails.innerHTML = '<p class="text-warning"><i class="fas fa-exclamation-triangle"></i> Xe chưa được đăng ký chủ sở hữu</p>';
+    }
+}
+
+function displaySessionInfo(sessionInfo) {
+    const sessionDetails = document.getElementById('sessionDetails');
+    
+    if (sessionInfo && sessionInfo.status === 'in_progress') {
+        const entryTime = parseDateTime(sessionInfo.entry_time);
+        const duration = calculateDuration(entryTime);
+        sessionDetails.innerHTML = `
+            <p class="mb-1"><strong>Thời gian vào:</strong> ${formatDateTime(entryTime)}</p>
+            <p class="mb-1"><strong>Thời gian đã gửi:</strong> ${duration}</p>
+            <p class="mb-1"><strong>Chỗ đỗ:</strong> ${sessionInfo.slot_number || 'Chưa xác định'}</p>
+            <p class="mb-1"><strong>Trạng thái:</strong> <span class="badge bg-warning">Đang gửi</span></p>
+        `;
+    } else {
+        sessionDetails.innerHTML = '<p class="text-info"><i class="fas fa-info-circle"></i> Xe không có phiên gửi xe đang hoạt động</p>';
+        document.getElementById('costEstimation').style.display = 'none';
+    }
+}
+
+function displayNoVehicleInfo(licensePlate) {
+    document.getElementById('vehicleDetails').innerHTML = `
+        <p class="text-danger"><i class="fas fa-times-circle"></i> Không tìm thấy xe ${licensePlate} trong hệ thống</p>
+    `;
+    document.getElementById('ownerDetails').innerHTML = `
+        <p class="text-danger"><i class="fas fa-times-circle"></i> Không có thông tin chủ xe</p>
+    `;
+    document.getElementById('sessionDetails').innerHTML = `
+        <p class="text-danger"><i class="fas fa-times-circle"></i> Không có phiên gửi xe</p>
+    `;
+    document.getElementById('costEstimation').style.display = 'none';
+}
+
+function calculateCostEstimation(sessionInfo) {
+    const costDetails = document.getElementById('costDetails');
+    
+    if (sessionInfo && sessionInfo.status === 'in_progress') {
+        const entryTime = parseDateTime(sessionInfo.entry_time);
+        const hours = calculateHours(entryTime);
+        const hourlyRate = 5000; // Default rate, should come from config
+        const estimatedCost = hours * hourlyRate;
+        
+        costDetails.innerHTML = `
+            <p class="mb-1"><strong>Thời gian gửi:</strong> ${hours.toFixed(2)} giờ</p>
+            <p class="mb-1"><strong>Đơn giá:</strong> ${formatCurrency(hourlyRate)}/giờ</p>
+            <p class="mb-1"><strong>Phí ước tính:</strong> <strong class="text-primary">${formatCurrency(estimatedCost)}</strong></p>
+        `;
+        document.getElementById('costEstimation').style.display = 'block';
+    } else {
+        document.getElementById('costEstimation').style.display = 'none';
+    }
+}
+
+// Utility functions
+function getVehicleTypeText(type) {
+    const types = {
+        'sedan': 'Sedan',
+        'suv': 'SUV',
+        'truck': 'Xe tải',
+        'motorcycle': 'Xe máy',
+        'other': 'Khác'
+    };
+    return types[type] || type;
+}
+
+// FIXED: Proper datetime parsing
+function parseDateTime(dateString) {
+    if (!dateString) return new Date();
+    
+    // Handle ISO format from database
+    if (dateString.includes('T')) {
+        return new Date(dateString);
+    }
+    
+    // Handle other formats
+    return new Date(dateString.replace(' ', 'T'));
+}
+
+function formatDateTime(date) {
+    return date.toLocaleString('vi-VN');
+}
+
+function formatDate(dateString) {
+    const date = parseDateTime(dateString);
+    return date.toLocaleDateString('vi-VN');
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+}
+
+// FIXED: Proper duration calculation
+function calculateDuration(entryTime) {
+    const now = new Date();
+    const diffMs = now - entryTime;
+    
+    if (diffMs < 0) {
+        return '0 phút'; // In case of future time
+    }
+    
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (diffHours === 0) {
+        return `${diffMinutes} phút`;
+    } else {
+        return `${diffHours} giờ ${diffMinutes} phút`;
+    }
+}
+
+// FIXED: Proper hours calculation
+function calculateHours(entryTime) {
+    const now = new Date();
+    const diffMs = now - entryTime;
+    
+    if (diffMs < 0) {
+        return 0; // In case of future time
+    }
+    
+    return diffMs / (1000 * 60 * 60);
+}
+
+// Quick action function
+function quickAction(issueType) {
+    document.getElementById('issue_type').value = issueType;
+    
+    const descriptions = {
+        'Mất thẻ': 'Khách hàng báo mất thẻ gửi xe. Đã xác minh thông tin và tính phí theo thời gian thực tế.',
+        'Không nhận diện được': 'Hệ thống không tự động nhận diện được biển số xe. Đã xử lý thủ công.',
+        'Hỏng barrier': 'Barrier không hoạt động bình thường. Đã liên hệ kỹ thuật và sử dụng điều khiển thủ công.',
+        'Lỗi thanh toán': 'Hệ thống thanh toán gặp sự cố. Đã sử dụng phương thức thanh toán thay thế.'
+    };
+    
+    const actions = {
+        'Mất thẻ': 'Xác minh thông tin chủ xe, tính phí theo thời gian thực tế, cấp thẻ mới.',
+        'Không nhận diện được': 'Sử dụng chức năng nhận diện ảnh, nhập thủ công biển số.',
+        'Hỏng barrier': 'Liên hệ đội kỹ thuật, sử dụng điều khiển thủ công.',
+        'Lỗi thanh toán': 'Kiểm tra kết nối hệ thống, sử dụng phương thức thanh toán thay thế.'
+    };
+    
+    document.getElementById('description').value = descriptions[issueType] || '';
+    document.getElementById('action_taken').value = actions[issueType] || `Đã xử lý sự cố ${issueType} theo quy trình.`;
+    
+    // Auto focus on next field
+    document.getElementById('description').focus();
+}
+
+// Form reset function
+function resetForm() {
+    document.getElementById('incidentForm').reset();
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('recognitionResult').style.display = 'none';
+    document.getElementById('vehicleInfo').style.display = 'none';
+    document.getElementById('ownerInfo').style.display = 'none';
+    document.getElementById('sessionInfo').style.display = 'none';
+    document.getElementById('costEstimation').style.display = 'none';
+    
+    // Reset urgency level border
+    document.getElementById('urgency_level').classList.remove('border-success', 'border-warning', 'border-danger', 'border-dark');
+    document.getElementById('urgency_level').classList.add('border-warning');
+}
+
+// Urgency level color coding
+document.getElementById('urgency_level').addEventListener('change', function() {
+    const colors = {
+        'low': 'success',
+        'medium': 'warning', 
+        'high': 'danger',
+        'critical': 'dark'
+    };
+    
+    // Remove previous color classes
+    this.classList.remove('border-success', 'border-warning', 'border-danger', 'border-dark');
+    
+    // Add new color class
+    this.classList.add(`border-${colors[this.value]}`);
+});
+
+// Auto-fill description based on issue type
+document.getElementById('issue_type').addEventListener('change', function() {
+    const descriptionField = document.getElementById('description');
+    const actionTakenField = document.getElementById('action_taken');
+    const issueType = this.value;
+    
+    const descriptions = {
+        'Mất thẻ': 'Khách hàng báo mất thẻ gửi xe. Cần xác minh thông tin và cấp thẻ mới.',
+        'Không nhận diện được': 'Hệ thống không tự động nhận diện được biển số xe. Cần xử lý thủ công.',
+        'Hỏng barrier': 'Barrier không hoạt động bình thường. Cần kiểm tra kỹ thuật.',
+        'Lỗi thanh toán': 'Hệ thống thanh toán gặp sự cố. Cần sử dụng phương thức thay thế.',
+        'Xe quá khổ': 'Xe có kích thước vượt quá quy định. Cần hướng dẫn vào khu vực riêng.',
+        'Mất vé': 'Khách hàng làm mất vé gửi xe. Cần xác minh và tính phí phù hợp.',
+        'Sự cố kỹ thuật': 'Hệ thống gặp sự cố kỹ thuật. Cần báo cáo đội kỹ thuật.',
+        'Va chạm': 'Xảy ra va chạm trong bãi xe. Cần ghi nhận và xử lý theo quy định.',
+        'Khác': ''
+    };
+    
+    const actions = {
+        'Mất thẻ': 'Xác minh thông tin chủ xe, tính phí theo thời gian thực tế, cấp thẻ mới.',
+        'Không nhận diện được': 'Sử dụng chức năng nhận diện ảnh, nhập thủ công biển số.',
+        'Hỏng barrier': 'Liên hệ đội kỹ thuật, sử dụng điều khiển thủ công.',
+        'Lỗi thanh toán': 'Kiểm tra kết nối hệ thống, sử dụng phương thức thanh toán thay thế.',
+        'Xe quá khổ': 'Hướng dẫn vào khu vực dành cho xe lớn, tính phí theo quy định.',
+        'Mất vé': 'Xác minh thông tin khách hàng, tính phí theo thời gian tối đa.',
+        'Sự cố kỹ thuật': 'Ghi nhận sự cố, báo cáo đội kỹ thuật, sử dụng biện pháp thay thế.',
+        'Va chạm': 'Chụp ảnh hiện trường, ghi nhận thông tin, liên hệ bảo hiểm nếu cần.',
+        'Khác': 'Ghi lại chi tiết sự cố, báo cáo quản lý để xử lý.'
+    };
+    
+    if (descriptions[issueType] && !descriptionField.value) {
+        descriptionField.value = descriptions[issueType];
+    }
+    if (actions[issueType] && !actionTakenField.value) {
+        actionTakenField.value = actions[issueType];
+    }
+});
+
+// Initialize webcam when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initWebcam();
+});
+
+// Clean up webcam stream when leaving page
+window.addEventListener('beforeunload', function() {
+    if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+    }
+});
+</script>
+
+<style>
+.border-success { border: 2px solid #28a745 !important; }
+.border-warning { border: 2px solid #ffc107 !important; }
+.border-danger { border: 2px solid #dc3545 !important; }
+.border-dark { border: 2px solid #343a40 !important; }
+
+#preview {
+    max-width: 100%;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+}
+
+.alert h6 {
+    margin-bottom: 8px;
+}
+
+.table th {
+    background-color: #2E7D32;
+    color: white;
+}
+
+.btn-outline-primary:hover { background-color: #0d6efd; color: white; }
+.btn-outline-warning:hover { background-color: #ffc107; color: black; }
+.btn-outline-danger:hover { background-color: #dc3545; color: white; }
+.btn-outline-info:hover { background-color: #0dcaf0; color: black; }
+
+.fa-spinner {
+    margin-right: 8px;
+}
+</style>
+{% endblock %}

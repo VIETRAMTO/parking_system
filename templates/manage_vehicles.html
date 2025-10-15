@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Quản Lý Phương Tiện - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-car"></i> Quản lý Phương tiện</h4>
+            </div>
+            <div class="card-body">
+                <!-- Search Form -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Tra cứu Phương tiện</h5>
+                        <form method="GET" action="{{ url_for('manage_vehicles') }}">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <select class="form-control" name="search_type">
+                                        <option value="license_plate" {% if search_type == 'license_plate' %}selected{% endif %}>Biển số xe</option>
+                                        <option value="owner" {% if search_type == 'owner' %}selected{% endif %}>Tên chủ xe</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="text" class="form-control" name="search_query" 
+                                           placeholder="Nhập thông tin tìm kiếm" value="{{ search_query }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-search"></i> Tìm kiếm
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Vehicles List -->
+                <h5 class="mb-3">Danh sách Phương tiện</h5>
+                {% if vehicles %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Biển số xe</th>
+                                <th>Loại xe</th>
+                                <th>Chủ xe</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for vehicle in vehicles %}
+                            <tr>
+                                <td>{{ vehicle.license_plate }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ vehicle.vehicle_type }}</span>
+                                </td>
+                                <td>{{ vehicle.username or 'Chưa đăng ký' }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('edit_vehicle', vehicle_id=vehicle.vehicle_id) }}" 
+                                           class="btn btn-outline-primary">
+                                            <i class="fas fa-edit"></i> Sửa
+                                        </a>
+                                        <form method="POST" action="{{ url_for('delete_vehicle', vehicle_id=vehicle.vehicle_id) }}" 
+                                              style="display: inline;" onsubmit="return confirm('Bạn có chắc muốn xóa phương tiện này?');">
+                                            <button type="submit" class="btn btn-outline-danger">
+                                                <i class="fas fa-trash"></i> Xóa
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info text-center">
+                    <i class="fas fa-info-circle"></i> Không tìm thấy phương tiện nào.
+                </div>
+                {% endif %}
+
+                <!-- Add Vehicle Button -->
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('add_vehicle') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus"></i> Thêm Phương tiện Mới
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

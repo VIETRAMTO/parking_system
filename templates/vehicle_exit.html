@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Xe Ra Bãi - Hệ Thống Bãi Xe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-sign-out-alt"></i> Xe Ra Bãi</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('vehicle_exit') }}" enctype="multipart/form-data">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <!-- Webcam Section -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0"><i class="fas fa-camera me-2"></i>Chụp ảnh biển số bằng Webcam</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="webcam-container" class="text-center mb-3">
+                                        <video id="webcam" autoplay playsinline class="w-100 rounded border" style="max-height: 250px; display: none;"></video>
+                                        <canvas id="canvas" class="d-none"></canvas>
+                                        <div id="no-camera" class="alert alert-warning" style="display: none;">
+                                            Không tìm thấy camera
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex gap-2 mb-3">
+                                        <button type="button" id="start-camera" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-play me-1"></i>Bật Camera
+                                        </button>
+                                        <button type="button" id="capture-btn" class="btn btn-success btn-sm" disabled>
+                                            <i class="fas fa-camera me-1"></i>Chụp Ảnh
+                                        </button>
+                                        <button type="button" id="retake-btn" class="btn btn-warning btn-sm" disabled>
+                                            <i class="fas fa-redo me-1"></i>Chụp Lại
+                                        </button>
+                                    </div>
+                                    
+                                    <div id="capture-preview" class="text-center" style="display: none;">
+                                        <img id="captured-image" src="#" alt="Ảnh đã chụp" class="img-fluid rounded border" style="max-height: 200px;">
+                                        <div class="mt-2">
+                                            <button type="button" id="use-photo" class="btn btn-success btn-sm">
+                                                <i class="fas fa-check me-1"></i>Sử dụng ảnh này
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Upload Section -->
+                            <div class="mb-3">
+                                <label for="image" class="form-label">Hoặc upload ảnh biển số</label>
+                                <input type="file" class="form-control" id="image" name="image" 
+                                       accept="image/*" capture="camera">
+                                <small class="form-text text-muted">Chụp ảnh hoặc upload ảnh biển số xe</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="license_plate" class="form-label">Biển số xe *</label>
+                                <input type="text" class="form-control" id="license_plate" name="license_plate" 
+                                       placeholder="VD: 51A-123.45" required pattern="\d{2}[A-Z]-\d{3}\.\d{2}">
+                                <small class="form-text text-muted">Định dạng: XXA-XXX.XX</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="payment_method" class="form-label">Phương thức thanh toán *</label>
+                                <select class="form-control" id="payment_method" name="payment_method" required>
+                                    <option value="balance">Thanh toán bằng số dư</option>
+                                    <option value="vnpay">Thanh toán qua VNPAY</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <!-- Preview Section -->
+                            <div id="imagePreview" class="card mb-3" style="display: none;">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="fas fa-image me-2"></i>Ảnh đã chụp</h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    <img id="preview" src="#" alt="Preview" class="img-fluid rounded" style="max-height: 250px;">
+                                    <div id="recognitionResult" class="mt-3 alert alert-info" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-check-circle"></i> Xác nhận ra bãi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Webcam functionality for exit page
+let stream = null;
+
+document.getElementById('start-camera').addEventListener('click', async function() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: 'environment'
+            } 
+        });
+        
+        const video = document.getElementById('webcam');
+        video.srcObject = stream;
+        video.style.display = 'block';
+        document.getElementById('no-camera').style.display = 'none';
+        
+        this.disabled = true;
+        document.getElementById('capture-btn').disabled = false;
+        document.getElementById('retake-btn').disabled = true;
+        
+        document.getElementById('capture-preview').style.display = 'none';
+        
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        document.getElementById('no-camera').style.display = 'block';
+        showToast('Không thể truy cập camera: ' + error.message, 'danger');
+    }
+});
+
+document.getElementById('capture-btn').addEventListener('click', function() {
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const capturedImage = document.getElementById('captured-image');
+    capturedImage.src = canvas.toDataURL('image/jpeg');
+    document.getElementById('capture-preview').style.display = 'block';
+    
+    document.getElementById('retake-btn').disabled = false;
+    this.disabled = true;
+});
+
+document.getElementById('retake-btn').addEventListener('click', function() {
+    document.getElementById('capture-preview').style.display = 'none';
+    document.getElementById('capture-btn').disabled = false;
+    this.disabled = true;
+});
+
+document.getElementById('use-photo').addEventListener('click', function() {
+    const canvas = document.getElementById('canvas');
+    const preview = document.getElementById('preview');
+    const imagePreview = document.getElementById('imagePreview');
+    
+    preview.src = canvas.toDataURL('image/jpeg');
+    imagePreview.style.display = 'block';
+    
+    canvas.toBlob(function(blob) {
+        const formData = new FormData();
+        formData.append('image', blob, 'captured_license_plate.jpg');
+        
+        fetch('/recognize_license_plate', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            const resultDiv = document.getElementById('recognitionResult');
+            if (data.license_plate && data.license_plate !== "Không nhận diện được") {
+                document.getElementById('license_plate').value = data.license_plate;
+                resultDiv.innerHTML = `<strong>Biển số nhận diện:</strong> ${data.license_plate}`;
+                resultDiv.className = 'mt-3 alert alert-success';
+                resultDiv.style.display = 'block';
+            } else {
+                resultDiv.innerHTML = `<strong>Không nhận diện được biển số</strong>`;
+                resultDiv.className = 'mt-3 alert alert-warning';
+                resultDiv.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Lỗi nhận diện biển số', 'danger');
+        });
+    }, 'image/jpeg', 0.8);
+    
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+    
+    document.getElementById('webcam').style.display = 'none';
+    document.getElementById('start-camera').disabled = false;
+    document.getElementById('capture-btn').disabled = true;
+    document.getElementById('retake-btn').disabled = true;
+    document.getElementById('capture-preview').style.display = 'none';
+});
+
+// File upload functionality
+document.getElementById('image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('preview').src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+            
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            fetch('/recognize_license_plate', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultDiv = document.getElementById('recognitionResult');
+                if (data.license_plate && data.license_plate !== "Không nhận diện được") {
+                    document.getElementById('license_plate').value = data.license_plate;
+                    resultDiv.innerHTML = `<strong>Biển số nhận diện:</strong> ${data.license_plate}`;
+                    resultDiv.className = 'mt-3 alert alert-success';
+                    resultDiv.style.display = 'block';
+                } else {
+                    resultDiv.innerHTML = `<strong>Không nhận diện được biển số</strong>`;
+                    resultDiv.className = 'mt-3 alert alert-warning';
+                    resultDiv.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Lỗi nhận diện biển số', 'danger');
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Stop camera when leaving page
+window.addEventListener('beforeunload', function() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+});
+</script>
+{% endblock %}
