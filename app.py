@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
-from flask_session import Session
 import sqlite3
 import pandas as pd
 import uuid
@@ -48,8 +47,7 @@ def parse_datetime_safe(dt_value):
 
 app = Flask(__name__)
 app.secret_key = 'parking_system_secret_key_2024'
-app.config['SESSION_TYPE'] = 'filesystem'
-Session(app)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
 # Cấu hình VNPAY
 VNP_TMNCODE = "VNR5SL3C"
@@ -79,6 +77,10 @@ def login_required(role=None):
             return f(*args, **kwargs)
         return decorated_function
     return decorator
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
 
 # Routes
 @app.route('/')
@@ -315,6 +317,7 @@ def vehicle_exit():
         conn.close()
     
     return render_template('vehicle_exit.html')
+
 @app.route('/recharge', methods=['GET', 'POST'])
 @login_required(role=['customer'])
 def recharge():
@@ -577,7 +580,99 @@ def handle_incidents():
             conn.close()
     
     return render_template('handle_incidents.html')
- 
+
+@app.route('/api/recent_incidents')
+@login_required(role=['admin', 'operator'])
+def get_recent_incidents():
+    conn = get_db_connection()
+    
+    try:
+        # Lấy sự cố trong 24h gần đây
+        incidents = conn.execute("""
+            SELECT 
+                incident_id,
+                license_plate,
+                issue_type,
+                urgency_level,
+                status,
+                reported_by,
+                resolved_by,
+                created_at
+            FROM Incident 
+            WHERE datetime(created_at) >= datetime('now', '-1 day')
+            ORDER BY created_at DESC
+            LIMIT 20
+        """).fetchall()
+        
+        incidents_list = []
+        for incident in incidents:
+            # Xử lý datetime
+            created_at = incident['created_at']
+            if isinstance(created_at, str):
+                try:
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                except ValueError:
+                    created_at = datetime.now()
+            
+            if isinstance(created_at, datetime):
+                created_at_str = created_at.strftime('%H:%M %d/%m')
+            else:
+                created_at_str = 'N/A'
+            
+            incidents_list.append({
+                'id': incident['incident_id'],
+                'license_plate': incident['license_plate'],
+                'issue_type': incident['issue_type'],
+                'urgency_level': incident['urgency_level'],
+                'status': incident['status'],
+                'reported_by': incident['reported_by'],
+                'created_at': created_at_str
+            })
+        
+        return jsonify(incidents_list)
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify([])
+    finally:
+        conn.close()
+@app.route('/api/update_incident_status/<incident_id>', methods=['POST'])
+@login_required(role=['admin', 'operator'])
+def update_incident_status(incident_id):
+    data = request.get_json()
+    new_status = data.get('status')
+    
+    if not new_status:
+        return jsonify({'success': False, 'error': 'Trạng thái không được để trống'})
+    
+    conn = get_db_connection()
+    try:
+        if new_status == 'resolved':
+            # Chuyển thành đã xử lý
+            conn.execute("""
+                UPDATE Incident 
+                SET status = 'resolved', 
+                    resolved_by = ?,
+                    resolved_at = CURRENT_TIMESTAMP
+                WHERE incident_id = ?
+            """, (session['username'], incident_id))
+        else:
+            # Chuyển thành chưa xử lý
+            conn.execute("""
+                UPDATE Incident 
+                SET status = 'open',
+                    resolved_by = NULL,
+                    resolved_at = NULL
+                WHERE incident_id = ?
+            """, (incident_id,))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Cập nhật trạng thái thành công'})
+    except sqlite3.Error as e:
+        return jsonify({'success': False, 'error': str(e)})
+    finally:
+        conn.close()
+
 @app.route('/configure_system', methods=['GET', 'POST'])
 @login_required(role=['admin'])
 def configure_system():
@@ -616,13 +711,31 @@ def configure_system():
             except sqlite3.Error:
                 flash('Lỗi khi lưu giá phí.', 'error')
     
+    # Handle user search
+    user_search = request.args.get('user_search', '')
+    active_tab = request.args.get('tab', 'general')
+    if user_search:
+        users = conn.execute("""
+            SELECT user_id, username, role, full_name, phone, email, balance 
+            FROM User 
+            WHERE username LIKE ? OR full_name LIKE ? OR email LIKE ? OR phone LIKE ?
+            ORDER BY username
+        """, (f"%{user_search}%", f"%{user_search}%", f"%{user_search}%", f"%{user_search}%")).fetchall()
+    else:
+        users = conn.execute("SELECT user_id, username, role, full_name, phone, email, balance FROM User ORDER BY username").fetchall()
+    
     config = conn.execute("SELECT name, total_slots, price_per_hour FROM SystemConfig WHERE id = 1").fetchone()
-    users = conn.execute("SELECT user_id, username, role, full_name, phone, email, balance FROM User").fetchall()
-    slots = conn.execute("SELECT slot_id, slot_number, status, location FROM ParkingSlot").fetchall()
+    slots = conn.execute("SELECT slot_id, slot_number, status, location FROM ParkingSlot ORDER BY slot_number").fetchall()
     devices = conn.execute("SELECT device_id, device_type, device_status, location FROM Device").fetchall()
     
     conn.close()
-    return render_template('configure_system.html', config=config, users=users, slots=slots, devices=devices)
+    return render_template('configure_system.html', 
+                         config=config, 
+                         users=users, 
+                         slots=slots, 
+                         devices=devices,
+                         user_search=user_search,
+                        active_tab=active_tab)
 @app.route('/dashboard')
 @login_required(role=['admin', 'operator'])
 def dashboard():
@@ -686,6 +799,7 @@ def dashboard():
                          sessions_data=sessions_list,
                          from_date=from_date,
                          to_date=to_date)
+
 @app.route('/account')
 @login_required(role=['customer'])
 def account():
@@ -811,8 +925,6 @@ def recognize_license_plate_endpoint():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
-
 @app.route('/add_parking_slot', methods=['POST'])
 @login_required(role=['admin'])
 def add_parking_slot():
@@ -832,7 +944,7 @@ def add_parking_slot():
     finally:
         conn.close()
     
-    return redirect(url_for('configure_system') + '#slots')
+    return redirect(url_for('configure_system') + '#slot')
 
 @app.route('/edit_parking_slot/<slot_id>', methods=['POST'])
 @login_required(role=['admin'])
@@ -852,7 +964,7 @@ def edit_parking_slot(slot_id):
     finally:
         conn.close()
     
-    return redirect(url_for('configure_system') + '#slots')
+    return redirect(url_for('configure_system') + '#slot')
 
 @app.route('/delete_parking_slot/<slot_id>', methods=['POST'])
 @login_required(role=['admin'])
@@ -867,24 +979,40 @@ def delete_parking_slot(slot_id):
     finally:
         conn.close()
     
-    return redirect(url_for('configure_system') + '#slots')
+    return redirect(url_for('configure_system') + '#slot')
 
 @app.route('/add_device', methods=['POST'])
 @login_required(role=['admin'])
 def add_device():
-    device_type = request.form['device_type']
+    device_type = request.form['device_type'].strip().lower()  # Thêm strip() và lower()
     device_status = request.form['device_status']
     device_location = request.form['device_location']
-    device_description = request.form.get('device_description', '')
+    
+    print(f"DEBUG: Received device_type = '{device_type}'")  # Debug
     
     conn = get_db_connection()
     try:
         device_id = str(uuid.uuid4())
-        conn.execute("INSERT INTO Device (device_id, device_type, device_status, location, description) VALUES (?, ?, ?, ?, ?)",
-                     (device_id, device_type, device_status, device_location, device_description))
+        
+        # SỬA: Chỉ chấp nhận các device_type được cho phép
+        allowed_types = ['camera', 'barrier', 'rfid_reader']
+        if device_type not in allowed_types:
+            flash(f'Loại thiết bị không hợp lệ: "{device_type}". Chỉ chấp nhận: {", ".join(allowed_types)}', 'error')
+            conn.close()
+            return redirect(url_for('configure_system') + '#devices')
+        
+        conn.execute("INSERT INTO Device (device_id, device_type, device_status, location) VALUES (?, ?, ?, ?)",
+                     (device_id, device_type, device_status, device_location))
         conn.commit()
         flash('Thêm thiết bị thành công!', 'success')
+    except sqlite3.IntegrityError as e:
+        print(f"DEBUG: IntegrityError - {e}")  # Debug
+        if "CHECK constraint failed" in str(e):
+            flash('Loại thiết bị không hợp lệ. Chỉ chấp nhận: camera, barrier, rfid_reader', 'error')
+        else:
+            flash(f'Lỗi khi thêm thiết bị: {e}', 'error')
     except sqlite3.Error as e:
+        print(f"DEBUG: SQLiteError - {e}")  # Debug
         flash(f'Lỗi khi thêm thiết bị: {e}', 'error')
     finally:
         conn.close()
@@ -894,39 +1022,38 @@ def add_device():
 @app.route('/edit_device/<device_id>', methods=['POST'])
 @login_required(role=['admin'])
 def edit_device(device_id):
-    device_type = request.form['device_type']
+    device_type = request.form['device_type'].strip().lower()  # Thêm strip() và lower()
     device_status = request.form['device_status']
     device_location = request.form['device_location']
     
+    print(f"DEBUG: Editing device - device_type = '{device_type}'")  # Debug
+    
     conn = get_db_connection()
     try:
+        # Validate device_type
+        allowed_types = ['camera', 'barrier', 'rfid_reader']
+        if device_type not in allowed_types:
+            flash(f'Loại thiết bị không hợp lệ: "{device_type}". Chỉ chấp nhận: {", ".join(allowed_types)}', 'error')
+            conn.close()
+            return redirect(url_for('configure_system') + '#devices')
+        
         conn.execute("UPDATE Device SET device_type = ?, device_status = ?, location = ? WHERE device_id = ?",
                      (device_type, device_status, device_location, device_id))
         conn.commit()
         flash('Cập nhật thiết bị thành công!', 'success')
+    except sqlite3.IntegrityError as e:
+        print(f"DEBUG: IntegrityError - {e}")  # Debug
+        if "CHECK constraint failed" in str(e):
+            flash('Loại thiết bị không hợp lệ. Chỉ chấp nhận: camera, barrier, rfid_reader', 'error')
+        else:
+            flash(f'Lỗi khi cập nhật thiết bị: {e}', 'error')
     except sqlite3.Error as e:
+        print(f"DEBUG: SQLiteError - {e}")  # Debug
         flash(f'Lỗi khi cập nhật thiết bị: {e}', 'error')
     finally:
         conn.close()
     
     return redirect(url_for('configure_system') + '#devices')
-
-@app.route('/delete_device/<device_id>', methods=['POST'])
-@login_required(role=['admin'])
-def delete_device(device_id):
-    conn = get_db_connection()
-    try:
-        conn.execute("DELETE FROM Device WHERE device_id = ?", (device_id,))
-        conn.commit()
-        flash('Xóa thiết bị thành công!', 'success')
-    except sqlite3.Error as e:
-        flash(f'Lỗi khi xóa thiết bị: {e}', 'error')
-    finally:
-        conn.close()
-    
-    return redirect(url_for('configure_system') + '#devices')
-
-
 @app.route('/get_vehicle_info/<license_plate>')
 @login_required(role=['admin', 'operator'])
 def get_vehicle_info(license_plate):
@@ -1008,29 +1135,15 @@ def get_vehicle_info(license_plate):
         conn.close()
         return jsonify({'error': str(e)}), 500
 
-def parse_datetime_safe(dt_value):
-    """
-    Safely parse datetime from various formats
-    """
-    if isinstance(dt_value, datetime):
-        return dt_value
-    elif isinstance(dt_value, str):
-        try:
-            # Try ISO format first
-            return datetime.fromisoformat(dt_value.replace('Z', '+00:00'))
-        except ValueError:
-            try:
-                # Try SQLite datetime format
-                return datetime.strptime(dt_value, '%Y-%m-%d %H:%M:%S')
-            except ValueError:
-                # Try other common formats
-                for fmt in ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d']:
-                    try:
-                        return datetime.strptime(dt_value, fmt)
-                    except ValueError:
-                        continue
-    return None
-
+@app.route('/get_price_configuration')
+def get_price_configuration():
+    conn = get_db_connection()
+    config = conn.execute("SELECT price_per_hour FROM SystemConfig WHERE id = 1").fetchone()
+    conn.close()
+    
+    return jsonify({
+        'price_per_hour': config['price_per_hour'] if config else 5000
+    })
 
 from jinja2 import Environment
 
@@ -1055,6 +1168,74 @@ def format_datetime(value, format='%d/%m/%Y %H:%M'):
 @app.template_filter('format_datetime')
 def format_datetime_filter(value, format='%d/%m/%Y %H:%M'):
     return format_datetime(value, format)
+# User Management Routes
+@app.route('/edit_user/<user_id>', methods=['POST'])
+@login_required(role=['admin'])
+def edit_user(user_id):
+    full_name = request.form['full_name']
+    phone = request.form['phone']
+    email = request.form['email']
+    role = request.form['role']
+    balance = float(request.form['balance'])
+    
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            UPDATE User SET full_name = ?, phone = ?, email = ?, role = ?, balance = ? 
+            WHERE user_id = ?
+        """, (full_name, phone, email, role, balance, user_id))
+        conn.commit()
+        flash('Cập nhật người dùng thành công!', 'success')
+    except sqlite3.Error as e:
+        flash(f'Lỗi khi cập nhật người dùng: {e}', 'error')
+    finally:
+        conn.close()
+    
+    return redirect(url_for('configure_system') + '#users')
+
+@app.route('/delete_user/<user_id>', methods=['POST'])
+@login_required(role=['admin'])
+def delete_user(user_id):
+    conn = get_db_connection()
+    try:
+        # Check if user is the last admin
+        user = conn.execute("SELECT role FROM User WHERE user_id = ?", (user_id,)).fetchone()
+        if user and user['role'] == 'admin':
+            admin_count = conn.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'").fetchone()[0]
+            if admin_count <= 1:
+                flash('Không thể xóa admin cuối cùng!', 'error')
+                conn.close()
+                return redirect(url_for('configure_system') + '#users')
+        
+        conn.execute("DELETE FROM User WHERE user_id = ?", (user_id,))
+        conn.commit()
+        flash('Xóa người dùng thành công!', 'success')
+    except sqlite3.Error as e:
+        flash(f'Lỗi khi xóa người dùng: {e}', 'error')
+    finally:
+        conn.close()
+    
+    return redirect(url_for('configure_system') + '#users')
+
+# Update the existing configure_system route to handle user search
+
+@app.route('/debug_tabs')
+@login_required(role=['admin'])
+def debug_tabs():
+    conn = get_db_connection()
+    
+    slots_count = conn.execute("SELECT COUNT(*) FROM ParkingSlot").fetchone()[0]
+    users_count = conn.execute("SELECT COUNT(*) FROM User").fetchone()[0]
+    devices_count = conn.execute("SELECT COUNT(*) FROM Device").fetchone()[0]
+    
+    conn.close()
+    
+    return jsonify({
+        'slots_count': slots_count,
+        'users_count': users_count,
+        'devices_count': devices_count,
+        'current_tab': request.args.get('tab', 'unknown')
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

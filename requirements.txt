@@ -1,14 +1,10 @@
 Flask==2.3.3
-Flask-Session==0.4.0
 pandas==2.0.3
 Pillow==10.0.0
 opencv-python==4.8.1.78
 easyocr==1.7.0
 numpy==1.24.3
-pyzbar==0.1.9
-qrcode==7.4.2
 reportlab==4.0.4
 pyzbar==0.1.9
 qrcode==7.4.2
 requests==2.31.0
-"@ | Out-File -FilePath requirements.txt -Encoding UTF8

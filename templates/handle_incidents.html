@@ -175,11 +175,11 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-light">
-                <h5 class="mb-0"><i class="fas fa-list"></i> Sự cố gần đây (24h)</h5>
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Sự cố gần đây (24h)</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover">
+                    <table class="table table-striped table-hover mb-0">
                         <thead class="table-dark">
                             <tr>
                                 <th>Thời gian</th>
@@ -187,14 +187,15 @@
                                 <th>Loại sự cố</th>
                                 <th>Mức độ</th>
                                 <th>Trạng thái</th>
-                                <th>Người xử lý</th>
+                                <th>Người báo cáo</th>
+                                <th>Thao tác</th>
                             </tr>
                         </thead>
                         <tbody id="recentIncidents">
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
-                                    <i class="fas fa-info-circle fa-2x mb-2"></i><br>
-                                    Chưa có sự cố nào được ghi nhận trong 24h qua
+                                <td colspan="7" class="text-center text-muted py-3">
+                                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                    Đang tải...
                                 </td>
                             </tr>
                         </tbody>
@@ -208,6 +209,161 @@
 
 {% block scripts %}
 <script>
+// Load recent incidents
+function loadRecentIncidents() {
+    const tbody = document.getElementById('recentIncidents');
+    
+    fetch('/api/recent_incidents')
+        .then(response => response.json())
+        .then(incidents => {
+            if (incidents.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Chưa có sự cố nào trong 24h qua
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            incidents.forEach(incident => {
+                // Màu sắc cho mức độ
+                let urgencyClass = 'bg-secondary';
+                let urgencyText = 'Thấp';
+                if (incident.urgency_level === 'high') {
+                    urgencyClass = 'bg-danger';
+                    urgencyText = 'Cao';
+                } else if (incident.urgency_level === 'medium') {
+                    urgencyClass = 'bg-warning';
+                    urgencyText = 'Trung bình';
+                }
+
+                // Màu sắc cho trạng thái
+                let statusClass = 'bg-warning';
+                let statusText = 'Chưa xử lý';
+                if (incident.status === 'resolved') {
+                    statusClass = 'bg-success';
+                    statusText = 'Đã xử lý';
+                }
+
+                // Nút chuyển trạng thái
+                let statusButton = '';
+                if (incident.status === 'resolved') {
+                    statusButton = `
+                        <button class="btn btn-sm btn-warning" onclick="updateIncidentStatus('${incident.id}', 'open')">
+                            <i class="fas fa-undo me-1"></i>Chưa xử lý
+                        </button>
+                    `;
+                } else {
+                    statusButton = `
+                        <button class="btn btn-sm btn-success" onclick="updateIncidentStatus('${incident.id}', 'resolved')">
+                            <i class="fas fa-check me-1"></i>Xử lý
+                        </button>
+                    `;
+                }
+
+                html += `
+                    <tr>
+                        <td>
+                            <small class="text-nowrap">${incident.created_at}</small>
+                        </td>
+                        <td>
+                            <strong class="font-monospace">${incident.license_plate}</strong>
+                        </td>
+                        <td>${incident.issue_type}</td>
+                        <td><span class="badge ${urgencyClass}">${urgencyText}</span></td>
+                        <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        <td>${incident.reported_by || 'N/A'}</td>
+                        <td>
+                            ${statusButton}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading incidents:', error);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center text-danger py-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Lỗi khi tải dữ liệu
+                    </td>
+                </tr>
+            `;
+        });
+}
+
+// Cập nhật trạng thái sự cố
+function updateIncidentStatus(incidentId, newStatus) {
+    const buttonText = newStatus === 'resolved' ? 'Đã xử lý' : 'Chưa xử lý';
+    
+    if (confirm(`Bạn có chắc chắn muốn chuyển trạng thái thành "${buttonText}"?`)) {
+        fetch(`/api/update_incident_status/${incidentId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                status: newStatus
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showFlashMessage(`Đã chuyển trạng thái thành "${buttonText}"!`, 'success');
+                loadRecentIncidents(); // Load lại danh sách
+            } else {
+                showFlashMessage('Lỗi: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error updating incident status:', error);
+            showFlashMessage('Lỗi khi cập nhật trạng thái', 'error');
+        });
+    }
+}
+
+// Hiển thị thông báo
+function showFlashMessage(message, type) {
+    const alertClass = type === 'error' ? 'alert-danger' : 'alert-success';
+    const flashId = 'incident-flash-message';
+    
+    // Remove existing flash message
+    const existingFlash = document.getElementById(flashId);
+    if (existingFlash) {
+        existingFlash.remove();
+    }
+    
+    const flashHtml = `
+        <div id="${flashId}" class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Add flash message
+    const cardHeader = document.querySelector('.card-header.bg-light');
+    if (cardHeader) {
+        cardHeader.insertAdjacentHTML('afterend', flashHtml);
+    }
+}
+
+// Tự động load khi trang được tải
+document.addEventListener('DOMContentLoaded', function() {
+    loadRecentIncidents();
+    
+    // Tự động làm mới mỗi 30 giây
+    setInterval(loadRecentIncidents, 30000);
+});
+</script>
+<script
+
 // Webcam functionality
 let webcamStream = null;
 

@@ -61,7 +61,8 @@
                             <div class="mb-3">
                                 <label for="license_plate" class="form-label">Biển số xe *</label>
                                 <input type="text" class="form-control" id="license_plate" name="license_plate" 
-                                       placeholder="VD: 51A-123.45" required pattern="\d{2}[A-Z]-\d{3}\.\d{2}">
+                                       placeholder="VD: 51A-123.45" required pattern="\d{2}[A-Z]-\d{3}\.\d{2}"
+                                       onblur="fetchVehicleDetails(this.value)">
                                 <small class="form-text text-muted">Định dạng: XXA-XXX.XX</small>
                             </div>
                             
@@ -95,15 +96,102 @@
                                 </div>
                             </div>
                             
-                            <!-- Owner Info Section -->
-                            <div id="ownerInfo" class="card" style="display: none;">
+                            <!-- Vehicle Information Section -->
+                            <div id="vehicleInfo" class="card mb-3" style="display: none;">
                                 <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-car me-2"></i>Thông tin phương tiện</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="vehicleDetails">
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <small class="text-muted">Biển số:</small>
+                                                <p id="info-license-plate" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Loại xe:</small>
+                                                <p id="info-vehicle-type" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Ngày đăng ký:</small>
+                                                <p id="info-created-at" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Trạng thái:</small>
+                                                <p id="info-status" class="fw-bold">-</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Owner Information Section -->
+                            <div id="ownerInfo" class="card mb-3" style="display: none;">
+                                <div class="card-header bg-primary text-white">
                                     <h6 class="mb-0"><i class="fas fa-user me-2"></i>Thông tin chủ xe</h6>
                                 </div>
                                 <div class="card-body">
-                                    <div id="ownerDetails"></div>
+                                    <div id="ownerDetails">
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <small class="text-muted">Tên đăng nhập:</small>
+                                                <p id="info-username" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Họ tên:</small>
+                                                <p id="info-fullname" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Số điện thoại:</small>
+                                                <p id="info-phone" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Email:</small>
+                                                <p id="info-email" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-12">
+                                                <small class="text-muted">Số dư:</small>
+                                                <p id="info-balance" class="fw-bold text-success">-</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+
+                            <!-- Current Session Information -->
+                            <div id="currentSessionInfo" class="card mb-3" style="display: none;">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="fas fa-history me-2"></i>Lịch sử gửi xe</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="sessionDetails">
+                                        <div class="alert alert-warning mb-2">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <strong>Xe đang trong bãi!</strong>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <small class="text-muted">Vào lúc:</small>
+                                                <p id="info-entry-time" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Thời gian:</small>
+                                                <p id="info-duration" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Chỗ đỗ:</small>
+                                                <p id="info-slot" class="fw-bold">-</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Dự tính phí:</small>
+                                                <p id="info-estimated-fee" class="fw-bold text-danger">-</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            
                         </div>
                     </div>
                     
@@ -121,9 +209,160 @@
 
 {% block scripts %}
 <script>
-// Webcam functionality
+// Global variables
+let currentPricePerHour = 5000;
 let stream = null;
 
+// Fetch price configuration on page load
+document.addEventListener('DOMContentLoaded', function() {
+    fetchPriceConfiguration();
+});
+
+// Fetch price configuration from server
+function fetchPriceConfiguration() {
+    fetch('/get_price_configuration')
+        .then(response => response.json())
+        .then(data => {
+            if (data.price_per_hour) {
+                currentPricePerHour = data.price_per_hour;
+                document.getElementById('info-price-per-hour').textContent = 
+                    formatNumber(currentPricePerHour) + ' VND/giờ';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching price configuration:', error);
+        });
+}
+
+// Fetch vehicle details when license plate is entered
+function fetchVehicleDetails(licensePlate) {
+    if (!licensePlate || !validateLicensePlate(licensePlate)) {
+        hideAllInfoSections();
+        return;
+    }
+
+    fetch(`/get_vehicle_info/${encodeURIComponent(licensePlate)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Vehicle not found');
+            }
+            return response.json();
+        })
+        .then(data => {
+            displayVehicleInfo(data);
+        })
+        .catch(error => {
+            console.error('Error fetching vehicle info:', error);
+            hideAllInfoSections();
+            showToast('Không tìm thấy thông tin xe', 'warning');
+        });
+}
+
+// Display vehicle information
+function displayVehicleInfo(data) {
+    // Vehicle Information
+    if (data.vehicle_info) {
+        document.getElementById('info-license-plate').textContent = data.vehicle_info.license_plate || '-';
+        document.getElementById('info-vehicle-type').textContent = getVehicleTypeName(data.vehicle_info.vehicle_type);
+        
+        if (data.vehicle_info.created_at) {
+            const createdDate = new Date(data.vehicle_info.created_at);
+            document.getElementById('info-created-at').textContent = formatDate(createdDate);
+        }
+        
+        document.getElementById('vehicleInfo').style.display = 'block';
+        
+        // Auto-fill vehicle type
+        document.getElementById('vehicle_type').value = data.vehicle_info.vehicle_type || 'sedan';
+    }
+
+    // Owner Information
+    if (data.owner_info) {
+        document.getElementById('info-username').textContent = data.owner_info.username || '-';
+        document.getElementById('info-fullname').textContent = data.owner_info.full_name || '-';
+        document.getElementById('info-phone').textContent = data.owner_info.phone || '-';
+        document.getElementById('info-email').textContent = data.owner_info.email || '-';
+        document.getElementById('info-balance').textContent = formatNumber(data.owner_info.balance || 0) + ' VND';
+        
+        document.getElementById('ownerInfo').style.display = 'block';
+        
+        // Auto-fill owner username
+        document.getElementById('owner_username').value = data.owner_info.username || '';
+    } else {
+        document.getElementById('ownerInfo').style.display = 'none';
+    }
+
+    // Current Session Information
+    if (data.session_info) {
+        const entryTime = new Date(data.session_info.entry_time);
+        const now = new Date();
+        const durationMs = now - entryTime;
+        const durationHours = durationMs / (1000 * 60 * 60);
+        
+        document.getElementById('info-entry-time').textContent = formatDateTime(entryTime);
+        document.getElementById('info-duration').textContent = formatDuration(durationMs);
+        document.getElementById('info-slot').textContent = data.session_info.slot_number || 'Chưa xác định';
+        
+        // Calculate estimated fee
+        const estimatedFee = calculateEstimatedFee(durationHours);
+        document.getElementById('info-estimated-fee').textContent = formatNumber(estimatedFee) + ' VND';
+        
+        document.getElementById('currentSessionInfo').style.display = 'block';
+    } else {
+        document.getElementById('currentSessionInfo').style.display = 'none';
+    }
+}
+
+// Hide all information sections
+function hideAllInfoSections() {
+    document.getElementById('vehicleInfo').style.display = 'none';
+    document.getElementById('ownerInfo').style.display = 'none';
+    document.getElementById('currentSessionInfo').style.display = 'none';
+}
+
+// Calculate estimated fee based on duration
+function calculateEstimatedFee(hours) {
+    const minFee = currentPricePerHour; // 1 hour minimum
+    const calculatedFee = hours * currentPricePerHour;
+    return Math.max(minFee, Math.ceil(calculatedFee / 1000) * 1000); // Round up to nearest 1000
+}
+
+// Format duration
+function formatDuration(ms) {
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+        return `${hours} giờ ${minutes} phút`;
+    } else {
+        return `${minutes} phút`;
+    }
+}
+
+// Format date time
+function formatDateTime(date) {
+    return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN');
+}
+
+// Get vehicle type name
+function getVehicleTypeName(type) {
+    const types = {
+        'sedan': 'Sedan',
+        'suv': 'SUV',
+        'truck': 'Xe tải',
+        'motorbike': 'Xe máy',
+        'other': 'Khác'
+    };
+    return types[type] || type;
+}
+
+// Validate license plate format
+function validateLicensePlate(plate) {
+    const pattern = /^\d{2}[A-Z]-\d{3}\.\d{2}$/;
+    return pattern.test(plate);
+}
+
+// Webcam functionality
 document.getElementById('start-camera').addEventListener('click', async function() {
     try {
         stream = await navigator.mediaDevices.getUserMedia({ 
@@ -143,7 +382,6 @@ document.getElementById('start-camera').addEventListener('click', async function
         document.getElementById('capture-btn').disabled = false;
         document.getElementById('retake-btn').disabled = true;
         
-        // Hide capture preview if showing
         document.getElementById('capture-preview').style.display = 'none';
         
     } catch (error) {
@@ -158,19 +396,14 @@ document.getElementById('capture-btn').addEventListener('click', function() {
     const canvas = document.getElementById('canvas');
     const context = canvas.getContext('2d');
     
-    // Set canvas size to match video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    
-    // Draw current video frame to canvas
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     
-    // Show captured image
     const capturedImage = document.getElementById('captured-image');
     capturedImage.src = canvas.toDataURL('image/jpeg');
     document.getElementById('capture-preview').style.display = 'block';
     
-    // Enable retake button
     document.getElementById('retake-btn').disabled = false;
     this.disabled = true;
 });
@@ -186,11 +419,9 @@ document.getElementById('use-photo').addEventListener('click', function() {
     const preview = document.getElementById('preview');
     const imagePreview = document.getElementById('imagePreview');
     
-    // Show preview
     preview.src = canvas.toDataURL('image/jpeg');
     imagePreview.style.display = 'block';
     
-    // Send image for recognition
     canvas.toBlob(function(blob) {
         const formData = new FormData();
         formData.append('image', blob, 'captured_license_plate.jpg');
@@ -208,8 +439,8 @@ document.getElementById('use-photo').addEventListener('click', function() {
                 resultDiv.className = 'mt-3 alert alert-success';
                 resultDiv.style.display = 'block';
                 
-                // Auto-fill owner info if available
-                fetchVehicleInfo(data.license_plate);
+                // Auto-fetch vehicle details
+                fetchVehicleDetails(data.license_plate);
                 
             } else {
                 resultDiv.innerHTML = `<strong>Không nhận diện được biển số</strong>`;
@@ -223,12 +454,10 @@ document.getElementById('use-photo').addEventListener('click', function() {
         });
     }, 'image/jpeg', 0.8);
     
-    // Stop camera
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
     
-    // Reset camera UI
     document.getElementById('webcam').style.display = 'none';
     document.getElementById('start-camera').disabled = false;
     document.getElementById('capture-btn').disabled = true;
@@ -245,7 +474,6 @@ document.getElementById('image').addEventListener('change', function(e) {
             document.getElementById('preview').src = e.target.result;
             document.getElementById('imagePreview').style.display = 'block';
             
-            // Send image for recognition
             const formData = new FormData();
             formData.append('image', file);
             
@@ -262,8 +490,8 @@ document.getElementById('image').addEventListener('change', function(e) {
                     resultDiv.className = 'mt-3 alert alert-success';
                     resultDiv.style.display = 'block';
                     
-                    // Auto-fill owner info if available
-                    fetchVehicleInfo(data.license_plate);
+                    // Auto-fetch vehicle details
+                    fetchVehicleDetails(data.license_plate);
                     
                 } else {
                     resultDiv.innerHTML = `<strong>Không nhận diện được biển số</strong>`;
@@ -279,35 +507,6 @@ document.getElementById('image').addEventListener('change', function(e) {
         reader.readAsDataURL(file);
     }
 });
-
-// Fetch vehicle owner information
-function fetchVehicleInfo(licensePlate) {
-    fetch(`/get_vehicle_info/${encodeURIComponent(licensePlate)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.owner_info) {
-                const ownerInfo = document.getElementById('ownerInfo');
-                const ownerDetails = document.getElementById('ownerDetails');
-                
-                ownerDetails.innerHTML = `
-                    <p><strong>Tên:</strong> ${data.owner_info.full_name || 'N/A'}</p>
-                    <p><strong>SĐT:</strong> ${data.owner_info.phone || 'N/A'}</p>
-                    <p><strong>Email:</strong> ${data.owner_info.email || 'N/A'}</p>
-                    <p><strong>Số dư:</strong> ${formatNumber(data.owner_info.balance || 0)} VND</p>
-                `;
-                
-                // Auto-fill owner username
-                if (data.owner_info.username) {
-                    document.getElementById('owner_username').value = data.owner_info.username;
-                }
-                
-                ownerInfo.style.display = 'block';
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching vehicle info:', error);
-        });
-}
 
 // Stop camera when leaving page
 window.addEventListener('beforeunload', function() {
