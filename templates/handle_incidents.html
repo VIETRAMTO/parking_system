@@ -361,8 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Tự động làm mới mỗi 30 giây
     setInterval(loadRecentIncidents, 30000);
 });
-</script>
-<script
+
 
 // Webcam functionality
 let webcamStream = null;
@@ -762,7 +761,8 @@ window.addEventListener('beforeunload', function() {
     }
 });
 </script>
-
+{% endblock %}
+{% block styles %}
 <style>
 .border-success { border: 2px solid #28a745 !important; }
 .border-warning { border: 2px solid #ffc107 !important; }

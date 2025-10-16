@@ -17,10 +17,36 @@
         body {
             background-color: var(--background-color);
             color: var(--text-color);
+            padding-top: 80px; /* Space for fixed header */
+            padding-bottom: 100px; /* Space for fixed footer */
+            min-height: 100vh;
+            position: relative;
         }
         
         .navbar {
             background-color: var(--primary-color) !important;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .footer {
+            background-color: var(--primary-color) !important;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
+            color: white;
+            padding: 15px 0;
+        }
+        
+        .main-content {
+            min-height: calc(100vh - 180px); /* Adjust based on header/footer height */
+            padding: 20px 0;
         }
         
         .btn-primary {
@@ -101,10 +127,48 @@
             color: #666;
             font-size: 0.8em;
         }
+        
+        /* Ensure dropdown menus appear above other content */
+        .dropdown-menu {
+            z-index: 1040;
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            body {
+                padding-top: 70px;
+                padding-bottom: 80px;
+            }
+            
+            .main-content {
+                min-height: calc(100vh - 150px);
+            }
+            
+            .navbar-brand {
+                font-size: 1rem;
+            }
+            
+            .nav-link {
+                font-size: 0.9rem;
+                padding: 0.5rem 0.8rem;
+            }
+        }
+        
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+        .navbar .license-plate-badge {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin-left: 5px;
+    }
     </style>
-    
 </head>
 <body>
+    <!-- Fixed Header -->
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('home') }}">
@@ -151,52 +215,73 @@
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
-                    {% if session.user_id %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-user"></i> {{ session.username }} ({{ session.role }})
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ url_for('account') if session.role == 'customer' else '#' }}">
-                                    <i class="fas fa-user-circle"></i> Tài khoản
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">
-                                    <i class="fas fa-sign-out-alt"></i> Đăng xuất
-                                </a></li>
-                            </ul>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('login') }}">Đăng Nhập</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('register') }}">Đăng Ký</a>
-                        </li>
-                    {% endif %}
-                </ul>
+    {% if session.user_id %}
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                <i class="fas fa-user"></i> 
+                {{ session.username }} 
+                {% if session.get('license_plate') %}
+                <small class="ms-1">({{ session.license_plate }})</small>
+                {% endif %}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <div class="px-3 py-2">
+                        <div class="fw-bold">{{ session.username }}</div>
+                        <div class="small text-muted">{{ session.role|title }}</div>
+                        {% if session.get('license_plate') %}
+                        <div class="small mt-1">
+                            <i class="fas fa-car me-1"></i>
+                            {{ session.license_plate }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{{ url_for('account') if session.role == 'customer' else '#' }}">
+                    <i class="fas fa-user-circle"></i> Tài khoản
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                    <i class="fas fa-sign-out-alt"></i> Đăng xuất
+                </a></li>
+            </ul>
+        </li>
+    {% else %}
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('login') }}">Đăng Nhập</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('register') }}">Đăng Ký</a>
+        </li>
+    {% endif %}
+</ul>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
 
-        {% block content %}{% endblock %}
+            {% block content %}{% endblock %}
+        </div>
     </div>
 
-    <footer class="bg-dark text-light mt-5 py-4">
+    <!-- Fixed Footer -->
+    <footer class="footer">
         <div class="container text-center">
-            <p>&copy; 2024 Hệ Thống Quản Lý Bãi Xe. All rights reserved.</p>
+            <p class="mb-0">&copy; 2024 Hệ Thống Quản Lý Bãi Xe. All rights reserved.</p>
         </div>
     </footer>
 

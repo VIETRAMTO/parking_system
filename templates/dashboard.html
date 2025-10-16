@@ -140,11 +140,94 @@
 {% block scripts %}
 <script>
 function exportToCSV() {
-    alert('Chức năng xuất CSV sẽ được triển khai sau');
+    const fromDate = document.getElementById('from_date').value;
+    const toDate = document.getElementById('to_date').value;
+    
+    let url = '/export_dashboard_csv';
+    if (fromDate && toDate) {
+        url += `?from_date=${fromDate}&to_date=${toDate}`;
+    }
+    
+    // Hiển thị thông báo
+    showExportMessage('Đang tạo báo cáo CSV...', 'info');
+    
+    // Tải file
+    window.location.href = url;
+    
+    // Ẩn thông báo sau 3 giây
+    setTimeout(() => {
+        const message = document.getElementById('export-message');
+        if (message) message.remove();
+    }, 3000);
 }
 
 function exportToPDF() {
-    alert('Chức năng xuất PDF sẽ được triển khai sau');
+    const fromDate = document.getElementById('from_date').value;
+    const toDate = document.getElementById('to_date').value;
+    
+    let url = '/export_dashboard_pdf';
+    if (fromDate && toDate) {
+        url += `?from_date=${fromDate}&to_date=${toDate}`;
+    }
+    
+    // Hiển thị thông báo
+    showExportMessage('Đang tạo báo cáo PDF...', 'info');
+    
+    // Tải file
+    window.location.href = url;
+    
+    // Ẩn thông báo sau 3 giây
+    setTimeout(() => {
+        const message = document.getElementById('export-message');
+        if (message) message.remove();
+    }, 3000);
 }
+
+function showExportMessage(message, type) {
+    const alertClass = type === 'error' ? 'alert-danger' : 'alert-info';
+    const messageId = 'export-message';
+    
+    // Remove existing message
+    const existingMessage = document.getElementById(messageId);
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+    
+    const messageHtml = `
+        <div id="${messageId}" class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="fas fa-sync-alt fa-spin me-2"></i>${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Add message before the table
+    const table = document.querySelector('.table-responsive');
+    if (table) {
+        table.insertAdjacentHTML('beforebegin', messageHtml);
+    } else {
+        const cardBody = document.querySelector('.card-body');
+        if (cardBody) {
+            cardBody.insertAdjacentHTML('afterbegin', messageHtml);
+        }
+    }
+}
+
+// Tự động set date mặc định nếu chưa có
+document.addEventListener('DOMContentLoaded', function() {
+    const fromDate = document.getElementById('from_date');
+    const toDate = document.getElementById('to_date');
+    
+    if (fromDate && !fromDate.value) {
+        // Mặc định 30 ngày trước
+        const defaultFromDate = new Date();
+        defaultFromDate.setDate(defaultFromDate.getDate() - 30);
+        fromDate.value = defaultFromDate.toISOString().split('T')[0];
+    }
+    
+    if (toDate && !toDate.value) {
+        // Mặc định hôm nay
+        toDate.value = new Date().toISOString().split('T')[0];
+    }
+});
 </script>
 {% endblock %}

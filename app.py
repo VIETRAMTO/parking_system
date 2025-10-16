@@ -4,7 +4,6 @@ import pandas as pd
 import uuid
 from datetime import datetime, timedelta
 import hashlib
-from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from io import BytesIO
 import easyocr
@@ -21,6 +20,13 @@ import requests
 import urllib.parse
 from anpr import recognize_license_plate, validate_license_plate
 import json
+import csv
+from io import StringIO, BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 def parse_datetime_safe(dt_value):
     """
@@ -1236,6 +1242,348 @@ def debug_tabs():
         'devices_count': devices_count,
         'current_tab': request.args.get('tab', 'unknown')
     })
+@app.route('/export_dashboard_csv')
+@login_required(role=['admin', 'operator'])
+def export_dashboard_csv():
+    # Lấy tham số từ URL
+    from_date = request.args.get('from_date', '')
+    to_date = request.args.get('to_date', '')
+    
+    conn = get_db_connection()
+    
+    try:
+        # Lấy dữ liệu sessions
+        if from_date and to_date:
+            sessions_data = conn.execute("""
+                SELECT 
+                    v.license_plate,
+                    ps.entry_time,
+                    ps.exit_time,
+                    ps.parking_fee,
+                    ps.status,
+                    pslot.slot_number
+                FROM ParkingSession ps 
+                JOIN Vehicle v ON ps.vehicle_id = v.vehicle_id
+                LEFT JOIN ParkingSlot pslot ON ps.slot_id = pslot.slot_id
+                WHERE date(ps.entry_time) BETWEEN ? AND ?
+                ORDER BY ps.entry_time DESC
+            """, (from_date, to_date)).fetchall()
+        else:
+            # Mặc định 30 ngày gần đây
+            sessions_data = conn.execute("""
+                SELECT 
+                    v.license_plate,
+                    ps.entry_time,
+                    ps.exit_time,
+                    ps.parking_fee,
+                    ps.status,
+                    pslot.slot_number
+                FROM ParkingSession ps 
+                JOIN Vehicle v ON ps.vehicle_id = v.vehicle_id
+                LEFT JOIN ParkingSlot pslot ON ps.slot_id = pslot.slot_id
+                WHERE date(ps.entry_time) >= date('now', '-30 days')
+                ORDER BY ps.entry_time DESC
+            """).fetchall()
+        
+        # Lấy thống kê
+        active_sessions = conn.execute("SELECT COUNT(*) FROM ParkingSession WHERE status = 'in_progress'").fetchone()[0]
+        total_revenue = conn.execute("SELECT SUM(parking_fee) FROM ParkingSession WHERE status = 'completed'").fetchone()[0] or 0.0
+        
+        if from_date and to_date:
+            filtered_revenue = conn.execute("""
+                SELECT SUM(parking_fee) FROM ParkingSession 
+                WHERE status = 'completed' AND date(entry_time) BETWEEN ? AND ?
+            """, (from_date, to_date)).fetchone()[0] or 0.0
+        else:
+            filtered_revenue = conn.execute("""
+                SELECT SUM(parking_fee) FROM ParkingSession 
+                WHERE status = 'completed' AND date(entry_time) >= date('now', '-30 days')
+            """).fetchone()[0] or 0.0
+        
+        # Tạo CSV
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Header thống kê
+        writer.writerow(['BÁO CÁO DASHBOARD - HỆ THỐNG BÃI XE'])
+        writer.writerow([f'Thời gian: {from_date} đến {to_date}' if from_date and to_date else 'Thời gian: 30 ngày gần đây'])
+        writer.writerow([f'Ngày xuất báo cáo: {datetime.now().strftime("%d/%m/%Y %H:%M")}'])
+        writer.writerow([])
+        writer.writerow(['THỐNG KÊ TỔNG QUAN'])
+        writer.writerow(['Xe đang trong bãi', active_sessions])
+        writer.writerow(['Tổng doanh thu', f'{total_revenue:,.0f} VND'])
+        writer.writerow(['Doanh thu khoảng thời gian', f'{filtered_revenue:,.0f} VND'])
+        writer.writerow([])
+        
+        # Header chi tiết
+        writer.writerow(['CHI TIẾT LỊCH SỬ GỬI XE'])
+        writer.writerow([
+            'Biển số xe', 'Thời gian vào', 'Thời gian ra', 
+            'Phí gửi xe (VND)', 'Trạng thái', 'Chỗ đỗ'
+        ])
+        
+        # Data chi tiết
+        for session in sessions_data:
+            # Xử lý thời gian
+            entry_time = session['entry_time']
+            if isinstance(entry_time, datetime):
+                entry_time_str = entry_time.strftime('%d/%m/%Y %H:%M')
+            elif isinstance(entry_time, str):
+                entry_time_str = entry_time[:16].replace('T', ' ')
+            else:
+                entry_time_str = str(entry_time)
+            
+            exit_time = session['exit_time']
+            if exit_time:
+                if isinstance(exit_time, datetime):
+                    exit_time_str = exit_time.strftime('%d/%m/%Y %H:%M')
+                elif isinstance(exit_time, str):
+                    exit_time_str = exit_time[:16].replace('T', ' ')
+                else:
+                    exit_time_str = str(exit_time)
+            else:
+                exit_time_str = 'Đang gửi'
+            
+            # Xử lý trạng thái
+            status_map = {
+                'completed': 'Hoàn thành',
+                'in_progress': 'Đang gửi'
+            }
+            status = status_map.get(session['status'], session['status'])
+            
+            writer.writerow([
+                session['license_plate'],
+                entry_time_str,
+                exit_time_str,
+                f'{session["parking_fee"] or 0:,.0f}',
+                status,
+                session['slot_number'] or 'N/A'
+            ])
+        
+        output.seek(0)
+        
+        # Tạo filename
+        if from_date and to_date:
+            filename = f'bao_cao_dashboard_{from_date}_den_{to_date}.csv'
+        else:
+            filename = 'bao_cao_dashboard_30_ngay.csv'
+        
+        return send_file(
+            BytesIO(output.getvalue().encode('utf-8-sig')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        print(f"Error exporting dashboard CSV: {e}")
+        return "Lỗi khi xuất báo cáo", 500
+    finally:
+        conn.close()
+
+@app.route('/export_dashboard_pdf')
+@login_required(role=['admin', 'operator'])
+def export_dashboard_pdf():
+    # Lấy tham số từ URL
+    from_date = request.args.get('from_date', '')
+    to_date = request.args.get('to_date', '')
+    
+    conn = get_db_connection()
+    
+    try:
+        # Lấy dữ liệu sessions (giống như CSV)
+        if from_date and to_date:
+            sessions_data = conn.execute("""
+                SELECT 
+                    v.license_plate,
+                    ps.entry_time,
+                    ps.exit_time,
+                    ps.parking_fee,
+                    ps.status,
+                    pslot.slot_number
+                FROM ParkingSession ps 
+                JOIN Vehicle v ON ps.vehicle_id = v.vehicle_id
+                LEFT JOIN ParkingSlot pslot ON ps.slot_id = pslot.slot_id
+                WHERE date(ps.entry_time) BETWEEN ? AND ?
+                ORDER BY ps.entry_time DESC
+            """, (from_date, to_date)).fetchall()
+        else:
+            sessions_data = conn.execute("""
+                SELECT 
+                    v.license_plate,
+                    ps.entry_time,
+                    ps.exit_time,
+                    ps.parking_fee,
+                    ps.status,
+                    pslot.slot_number
+                FROM ParkingSession ps 
+                JOIN Vehicle v ON ps.vehicle_id = v.vehicle_id
+                LEFT JOIN ParkingSlot pslot ON ps.slot_id = pslot.slot_id
+                WHERE date(ps.entry_time) >= date('now', '-30 days')
+                ORDER BY ps.entry_time DESC
+            """).fetchall()
+        
+        # Lấy thống kê (giống như CSV)
+        active_sessions = conn.execute("SELECT COUNT(*) FROM ParkingSession WHERE status = 'in_progress'").fetchone()[0]
+        total_revenue = conn.execute("SELECT SUM(parking_fee) FROM ParkingSession WHERE status = 'completed'").fetchone()[0] or 0.0
+        
+        if from_date and to_date:
+            filtered_revenue = conn.execute("""
+                SELECT SUM(parking_fee) FROM ParkingSession 
+                WHERE status = 'completed' AND date(entry_time) BETWEEN ? AND ?
+            """, (from_date, to_date)).fetchone()[0] or 0.0
+        else:
+            filtered_revenue = conn.execute("""
+                SELECT SUM(parking_fee) FROM ParkingSession 
+                WHERE status = 'completed' AND date(entry_time) >= date('now', '-30 days')
+            """).fetchone()[0] or 0.0
+        
+        # Tạo PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                              rightMargin=72, leftMargin=72, 
+                              topMargin=72, bottomMargin=18)
+        
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Tiêu đề
+        title_style = styles['Heading1']
+        title_style.alignment = 1
+        title = Paragraph("BÁO CÁO DASHBOARD - HỆ THỐNG BÃI XE", title_style)
+        elements.append(title)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Thông tin thời gian
+        time_range = f"{from_date} đến {to_date}" if from_date and to_date else "30 ngày gần đây"
+        info_text = f"Thời gian: {time_range}<br/>Ngày xuất báo cáo: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        info = Paragraph(info_text, styles['Normal'])
+        elements.append(info)
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Thống kê tổng quan
+        stats_style = styles['Heading2']
+        stats_style.alignment = 0
+        stats_title = Paragraph("THỐNG KÊ TỔNG QUAN", stats_style)
+        elements.append(stats_title)
+        elements.append(Spacer(1, 0.1*inch))
+        
+        # Bảng thống kê
+        stats_data = [
+            ['Chỉ số', 'Giá trị'],
+            ['Xe đang trong bãi', str(active_sessions)],
+            ['Tổng doanh thu', f'{total_revenue:,.0f} VND'],
+            ['Doanh thu khoảng thời gian', f'{filtered_revenue:,.0f} VND']
+        ]
+        
+        stats_table = Table(stats_data, colWidths=[3*inch, 2*inch])
+        stats_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(stats_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Chi tiết lịch sử
+        if sessions_data:
+            details_title = Paragraph("CHI TIẾT LỊCH SỬ GỬI XE", stats_style)
+            elements.append(details_title)
+            elements.append(Spacer(1, 0.1*inch))
+            
+            # Header bảng chi tiết
+            detail_data = [['Biển số', 'Thời gian vào', 'Thời gian ra', 'Phí (VND)', 'Trạng thái']]
+            
+            # Data chi tiết
+            for session in sessions_data[:50]:  # Giới hạn 50 bản ghi cho PDF
+                entry_time = session['entry_time']
+                if isinstance(entry_time, datetime):
+                    entry_time_str = entry_time.strftime('%d/%m %H:%M')
+                elif isinstance(entry_time, str):
+                    entry_time_str = entry_time[:16].replace('T', ' ')
+                else:
+                    entry_time_str = str(entry_time)
+                
+                exit_time = session['exit_time']
+                if exit_time:
+                    if isinstance(exit_time, datetime):
+                        exit_time_str = exit_time.strftime('%d/%m %H:%M')
+                    elif isinstance(exit_time, str):
+                        exit_time_str = exit_time[:16].replace('T', ' ')
+                    else:
+                        exit_time_str = str(exit_time)
+                else:
+                    exit_time_str = 'Đang gửi'
+                
+                status_map = {
+                    'completed': 'Hoàn thành',
+                    'in_progress': 'Đang gửi'
+                }
+                status = status_map.get(session['status'], session['status'])
+                
+                detail_data.append([
+                    session['license_plate'],
+                    entry_time_str,
+                    exit_time_str,
+                    f'{session["parking_fee"] or 0:,.0f}',
+                    status
+                ])
+            
+            # Tạo bảng chi tiết
+            detail_table = Table(detail_data, colWidths=[1.2*inch, 1.5*inch, 1.5*inch, 1.0*inch, 1.0*inch])
+            detail_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
+            ]))
+            elements.append(detail_table)
+            
+            if len(sessions_data) > 50:
+                elements.append(Spacer(1, 0.1*inch))
+                note = Paragraph(f"<i>Hiển thị 50/{len(sessions_data)} bản ghi đầu tiên</i>", styles['Italic'])
+                elements.append(note)
+        else:
+            no_data = Paragraph("Không có dữ liệu phiên đỗ xe trong khoảng thời gian này.", styles['Normal'])
+            elements.append(no_data)
+        
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+        
+        # Tạo filename
+        if from_date and to_date:
+            filename = f'bao_cao_dashboard_{from_date}_den_{to_date}.pdf'
+        else:
+            filename = 'bao_cao_dashboard_30_ngay.pdf'
+        
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        print(f"Error exporting dashboard PDF: {e}")
+        return "Lỗi khi xuất báo cáo", 500
+    finally:
+        conn.close()
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
