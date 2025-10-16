@@ -28,6 +28,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 
+
 def parse_datetime_safe(dt_value):
     """
     Safely parse datetime from various formats
@@ -111,6 +112,28 @@ def home():
                          address=address,
                          managing_agency=managing_agency,
                          price_per_hour=price_per_hour)
+@app.context_processor
+def utility_processor():
+    def calculate_duration(start, end):
+        """Calculate duration between two datetimes"""
+        try:
+            if isinstance(start, str):
+                start = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            if isinstance(end, str):
+                end = datetime.fromisoformat(end.replace('Z', '+00:00'))
+            
+            duration = end - start
+            hours = int(duration.total_seconds() // 3600)
+            minutes = int((duration.total_seconds() % 3600) // 60)
+            
+            if hours > 0:
+                return f"{hours}h {minutes}p"
+            else:
+                return f"{minutes} phút"
+        except:
+            return "N/A"
+    
+    return dict(calculate_duration=calculate_duration)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -752,16 +775,26 @@ def dashboard():
     
     from_date = request.args.get('from_date', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
     to_date = request.args.get('to_date', datetime.now().strftime('%Y-%m-%d'))
+    license_plate = request.args.get('license_plate', '')  # THÊM: tham số tìm kiếm biển số
     
     try:
-        # Sử dụng query đơn giản hơn
-        sessions_data = conn.execute("""
+        # Xây dựng query linh hoạt
+        query = """
             SELECT ps.session_id, v.license_plate, ps.entry_time, ps.exit_time, ps.parking_fee, ps.status
             FROM ParkingSession ps 
             JOIN Vehicle v ON ps.vehicle_id = v.vehicle_id
             WHERE date(ps.entry_time) BETWEEN ? AND ?
-            ORDER BY ps.entry_time DESC
-        """, (from_date, to_date)).fetchall()
+        """
+        params = [from_date, to_date]
+        
+        # THÊM: Điều kiện tìm kiếm biển số
+        if license_plate:
+            query += " AND v.license_plate LIKE ?"
+            params.append(f"%{license_plate}%")
+        
+        query += " ORDER BY ps.entry_time DESC"
+        
+        sessions_data = conn.execute(query, params).fetchall()
         
         # Convert to list of dictionaries và xử lý datetime
         sessions_list = []
@@ -791,10 +824,14 @@ def dashboard():
         # Tính doanh thu
         filtered_revenue = sum(session['parking_fee'] or 0 for session in sessions_list if session['status'] == 'completed')
         
+        # THÊM: Tính tổng lượt gửi trong khoảng thời gian
+        total_sessions = len(sessions_list)
+        
     except Exception as e:
         print(f"Error loading sessions data: {e}")
         filtered_revenue = 0.0
         sessions_list = []
+        total_sessions = 0  # THÊM: Khởi tạo tổng lượt gửi
     
     conn.close()
     
@@ -803,9 +840,10 @@ def dashboard():
                          total_revenue=total_revenue,
                          filtered_revenue=filtered_revenue,
                          sessions_data=sessions_list,
+                         total_sessions=total_sessions,  # THÊM: truyền tổng lượt gửi
+                         license_plate=license_plate,    # THÊM: truyền biển số tìm kiếm
                          from_date=from_date,
                          to_date=to_date)
-
 @app.route('/account')
 @login_required(role=['customer'])
 def account():
@@ -987,79 +1025,7 @@ def delete_parking_slot(slot_id):
     
     return redirect(url_for('configure_system') + '#slot')
 
-@app.route('/add_device', methods=['POST'])
-@login_required(role=['admin'])
-def add_device():
-    device_type = request.form['device_type'].strip().lower()  # Thêm strip() và lower()
-    device_status = request.form['device_status']
-    device_location = request.form['device_location']
-    
-    print(f"DEBUG: Received device_type = '{device_type}'")  # Debug
-    
-    conn = get_db_connection()
-    try:
-        device_id = str(uuid.uuid4())
-        
-        # SỬA: Chỉ chấp nhận các device_type được cho phép
-        allowed_types = ['camera', 'barrier', 'rfid_reader']
-        if device_type not in allowed_types:
-            flash(f'Loại thiết bị không hợp lệ: "{device_type}". Chỉ chấp nhận: {", ".join(allowed_types)}', 'error')
-            conn.close()
-            return redirect(url_for('configure_system') + '#devices')
-        
-        conn.execute("INSERT INTO Device (device_id, device_type, device_status, location) VALUES (?, ?, ?, ?)",
-                     (device_id, device_type, device_status, device_location))
-        conn.commit()
-        flash('Thêm thiết bị thành công!', 'success')
-    except sqlite3.IntegrityError as e:
-        print(f"DEBUG: IntegrityError - {e}")  # Debug
-        if "CHECK constraint failed" in str(e):
-            flash('Loại thiết bị không hợp lệ. Chỉ chấp nhận: camera, barrier, rfid_reader', 'error')
-        else:
-            flash(f'Lỗi khi thêm thiết bị: {e}', 'error')
-    except sqlite3.Error as e:
-        print(f"DEBUG: SQLiteError - {e}")  # Debug
-        flash(f'Lỗi khi thêm thiết bị: {e}', 'error')
-    finally:
-        conn.close()
-    
-    return redirect(url_for('configure_system') + '#devices')
 
-@app.route('/edit_device/<device_id>', methods=['POST'])
-@login_required(role=['admin'])
-def edit_device(device_id):
-    device_type = request.form['device_type'].strip().lower()  # Thêm strip() và lower()
-    device_status = request.form['device_status']
-    device_location = request.form['device_location']
-    
-    print(f"DEBUG: Editing device - device_type = '{device_type}'")  # Debug
-    
-    conn = get_db_connection()
-    try:
-        # Validate device_type
-        allowed_types = ['camera', 'barrier', 'rfid_reader']
-        if device_type not in allowed_types:
-            flash(f'Loại thiết bị không hợp lệ: "{device_type}". Chỉ chấp nhận: {", ".join(allowed_types)}', 'error')
-            conn.close()
-            return redirect(url_for('configure_system') + '#devices')
-        
-        conn.execute("UPDATE Device SET device_type = ?, device_status = ?, location = ? WHERE device_id = ?",
-                     (device_type, device_status, device_location, device_id))
-        conn.commit()
-        flash('Cập nhật thiết bị thành công!', 'success')
-    except sqlite3.IntegrityError as e:
-        print(f"DEBUG: IntegrityError - {e}")  # Debug
-        if "CHECK constraint failed" in str(e):
-            flash('Loại thiết bị không hợp lệ. Chỉ chấp nhận: camera, barrier, rfid_reader', 'error')
-        else:
-            flash(f'Lỗi khi cập nhật thiết bị: {e}', 'error')
-    except sqlite3.Error as e:
-        print(f"DEBUG: SQLiteError - {e}")  # Debug
-        flash(f'Lỗi khi cập nhật thiết bị: {e}', 'error')
-    finally:
-        conn.close()
-    
-    return redirect(url_for('configure_system') + '#devices')
 @app.route('/get_vehicle_info/<license_plate>')
 @login_required(role=['admin', 'operator'])
 def get_vehicle_info(license_plate):
@@ -1222,6 +1188,97 @@ def delete_user(user_id):
         conn.close()
     
     return redirect(url_for('configure_system') + '#users')
+
+@app.route('/add_device', methods=['POST'])
+@login_required(role=['admin'])
+def add_device():
+    device_type = request.form['device_type'].strip().lower()
+    device_status = request.form['device_status']
+    device_location = request.form['device_location']
+    
+    print(f"DEBUG: Adding device - type: {device_type}, status: {device_status}, location: {device_location}")
+    
+    conn = get_db_connection()
+    try:
+        device_id = str(uuid.uuid4())
+        
+        # Validate device_type
+        allowed_types = ['camera', 'barrier', 'rfid_reader']
+        if device_type not in allowed_types:
+            flash(f'Loại thiết bị không hợp lệ: "{device_type}". Chỉ chấp nhận: {", ".join(allowed_types)}', 'error')
+            conn.close()
+            return redirect(url_for('configure_system') + '#devices')
+        
+        # Sửa lỗi SQL syntax - đảm bảo đúng số lượng parameters
+        conn.execute(
+            "INSERT INTO Device (device_id, device_type, device_status, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (device_id, device_type, device_status, device_location, datetime.now(), datetime.now())
+        )
+        conn.commit()
+        flash('Thêm thiết bị thành công!', 'success')
+        print(f"DEBUG: Device added successfully - ID: {device_id}")
+        
+    except sqlite3.Error as e:
+        print(f"DEBUG: SQL Error - {e}")
+        flash(f'Lỗi khi thêm thiết bị: {e}', 'error')
+    finally:
+        conn.close()
+    
+    return redirect(url_for('configure_system') + '#devices')
+
+@app.route('/edit_device/<device_id>', methods=['POST'])
+@login_required(role=['admin'])
+def edit_device(device_id):
+    device_type = request.form['device_type'].strip().lower()
+    device_status = request.form['device_status']
+    device_location = request.form['device_location']
+    
+    print(f"DEBUG: Editing device {device_id} - type: {device_type}, status: {device_status}, location: {device_location}")
+    
+    conn = get_db_connection()
+    try:
+        # Validate device_type
+        allowed_types = ['camera', 'barrier', 'rfid_reader']
+        if device_type not in allowed_types:
+            flash(f'Loại thiết bị không hợp lệ: "{device_type}". Chỉ chấp nhận: {", ".join(allowed_types)}', 'error')
+            conn.close()
+            return redirect(url_for('configure_system') + '#devices')
+        
+        # Sửa lỗi SQL syntax - đảm bảo đúng số lượng parameters
+        conn.execute(
+            "UPDATE Device SET device_type = ?, device_status = ?, location = ?, updated_at = ? WHERE device_id = ?",
+            (device_type, device_status, device_location, datetime.now(), device_id)
+        )
+        conn.commit()
+        flash('Cập nhật thiết bị thành công!', 'success')
+        print(f"DEBUG: Device updated successfully - ID: {device_id}")
+        
+    except sqlite3.Error as e:
+        print(f"DEBUG: SQL Error - {e}")
+        flash(f'Lỗi khi cập nhật thiết bị: {e}', 'error')
+    finally:
+        conn.close()
+    
+    return redirect(url_for('configure_system') + '#devices')
+
+@app.route('/delete_device/<device_id>', methods=['POST'])
+@login_required(role=['admin'])
+def delete_device(device_id):
+    print(f"DEBUG: Deleting device - ID: {device_id}")
+    
+    conn = get_db_connection()
+    try:
+        conn.execute("DELETE FROM Device WHERE device_id = ?", (device_id,))
+        conn.commit()
+        flash('Xóa thiết bị thành công!', 'success')
+        print(f"DEBUG: Device deleted successfully - ID: {device_id}")
+    except sqlite3.Error as e:
+        print(f"DEBUG: SQL Error - {e}")
+        flash(f'Lỗi khi xóa thiết bị: {e}', 'error')
+    finally:
+        conn.close()
+    
+    return redirect(url_for('configure_system') + '#devices')
 
 # Update the existing configure_system route to handle user search
 

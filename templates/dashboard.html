@@ -11,64 +11,86 @@
             </div>
             <div class="card-body">
                 <!-- Statistics -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="stat-box text-center">
-                            <div class="stat-title">Xe đang trong bãi</div>
-                            <div class="stat-value">{{ active_sessions }}</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="stat-box text-center">
-                            <div class="stat-title">Tổng doanh thu</div>
-                            <div class="stat-value">{{ "%.0f"|format(total_revenue) }} VND</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="stat-box text-center">
-                            <div class="stat-title">Doanh thu (khoảng thời gian)</div>
-                            <div class="stat-value">{{ "%.0f"|format(filtered_revenue) }} VND</div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-box text-center">
+            <div class="stat-title">Xe đang trong bãi</div>
+            <div class="stat-value">{{ active_sessions }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-box text-center">
+            <div class="stat-title">Tổng lượt gửi</div>
+            <div class="stat-value">{{ total_sessions }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-box text-center">
+            <div class="stat-title">Tổng doanh thu</div>
+            <div class="stat-value">{{ "%.0f"|format(total_revenue) }} VND</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-box text-center">
+            <div class="stat-title">Doanh thu (khoảng thời gian)</div>
+            <div class="stat-value">{{ "%.0f"|format(filtered_revenue) }} VND</div>
+        </div>
+    </div>
+</div>
 
-                <!-- Date Filter -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Bộ lọc thời gian</h5>
-                        <form method="GET" action="{{ url_for('dashboard') }}">
-                            <div class="row">
-                                <div class="col-md-5">
-                                    <label for="from_date" class="form-label">Từ ngày</label>
-                                    <input type="date" class="form-control" id="from_date" name="from_date" 
-                                           value="{{ from_date }}">
-                                </div>
-                                <div class="col-md-5">
-                                    <label for="to_date" class="form-label">Đến ngày</label>
-                                    <input type="date" class="form-control" id="to_date" name="to_date" 
-                                           value="{{ to_date }}">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">&nbsp;</label>
-                                    <button type="submit" class="btn btn-primary w-100">
-                                        <i class="fas fa-filter"></i> Lọc
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
+<!-- Date Filter và Search -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Bộ lọc thời gian & Tìm kiếm</h5>
+        <form method="GET" action="{{ url_for('dashboard') }}">
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="license_plate" class="form-label">Tìm theo biển số</label>
+                    <input type="text" class="form-control" id="license_plate" name="license_plate" 
+                           value="{{ license_plate }}" placeholder="Nhập biển số xe...">
+                </div>
+                <div class="col-md-3">
+                    <label for="from_date" class="form-label">Từ ngày</label>
+                    <input type="date" class="form-control" id="from_date" name="from_date" 
+                           value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="to_date" class="form-label">Đến ngày</label>
+                    <input type="date" class="form-control" id="to_date" name="to_date" 
+                           value="{{ to_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Lọc & Tìm
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-refresh"></i> Reset
+                        </a>
                     </div>
                 </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+                
+
+                
 
                 <!-- Sessions Table -->
                 <h5 class="mb-3">Lịch sử gửi xe</h5>
                 {% if sessions_data %}
                 <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
                             <tr>
                                 <th>Biển số xe</th>
                                 <th>Thời gian vào</th>
                                 <th>Thời gian ra</th>
+                                <th>Thời gian gửi</th>
                                 <th>Phí gửi xe</th>
                                 <th>Trạng thái</th>
                             </tr>
@@ -76,12 +98,21 @@
                         <tbody>
                             {% for session in sessions_data %}
                             <tr>
-                                <td>{{ session.license_plate }}</td>
                                 <td>
-                                    {% if session.entry_time is string %}
-                                        {{ session.entry_time[:16]|replace('T', ' ') }}
+                                    <strong>{{ session.license_plate }}</strong>
+                                    {% if session.vehicle_type %}
+                                    <br><small class="text-muted">{{ session.vehicle_type }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if session.entry_time %}
+                                        {% if session.entry_time is string %}
+                                            {{ session.entry_time[:16]|replace('T', ' ') }}
+                                        {% else %}
+                                            {{ session.entry_time.strftime('%d/%m/%Y %H:%M') }}
+                                        {% endif %}
                                     {% else %}
-                                        {{ session.entry_time.strftime('%d/%m/%Y %H:%M') }}
+                                        <span class="text-muted">N/A</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -96,15 +127,28 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    {% if session.entry_time and session.exit_time %}
+                                        {% if session.entry_time is string and session.exit_time is string %}
+                                            {% set entry = session.entry_time[:19] %}
+                                            {% set exit = session.exit_time[:19] %}
+                                            {{ calculate_duration(entry, exit) }}
+                                        {% else %}
+                                            {{ calculate_duration(session.entry_time, session.exit_time) }}
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     {% if session.parking_fee %}
-                                        {{ "%.0f"|format(session.parking_fee) }} VND
+                                        <strong class="text-success">{{ "%.0f"|format(session.parking_fee) }} VND</strong>
                                     {% else %}
                                         <span class="text-muted">0 VND</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     <span class="badge bg-{{ 'success' if session.status == 'completed' else 'warning' }}">
-                                        {{ session.status }}
+                                        {{ 'Hoàn thành' if session.status == 'completed' else 'Đang gửi' }}
                                     </span>
                                 </td>
                             </tr>
@@ -115,20 +159,25 @@
 
                 <!-- Export Buttons -->
                 <div class="row mt-4">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <button class="btn btn-success w-100" onclick="exportToCSV()">
                             <i class="fas fa-file-csv"></i> Tải báo cáo CSV
                         </button>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <button class="btn btn-danger w-100" onclick="exportToPDF()">
                             <i class="fas fa-file-pdf"></i> Tải báo cáo PDF
                         </button>
                     </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-2 bg-light rounded">
+                            <small class="text-muted">Tổng số bản ghi: <strong>{{ sessions_data|length }}</strong></small>
+                        </div>
+                    </div>
                 </div>
                 {% else %}
-                <div class="alert alert-info text-center">
-                    <i class="fas fa-info-circle"></i> Không có dữ liệu phiên đỗ xe trong khoảng thời gian này.
+                <div class="alert alert-warning text-center">
+                    <i class="fas fa-exclamation-triangle"></i> Không tìm thấy dữ liệu phiên đỗ xe phù hợp với bộ lọc.
                 </div>
                 {% endif %}
             </div>
@@ -140,21 +189,22 @@
 {% block scripts %}
 <script>
 function exportToCSV() {
+    const licensePlate = document.getElementById('license_plate').value;
     const fromDate = document.getElementById('from_date').value;
     const toDate = document.getElementById('to_date').value;
     
-    let url = '/export_dashboard_csv';
-    if (fromDate && toDate) {
-        url += `?from_date=${fromDate}&to_date=${toDate}`;
-    }
+    let url = '/export_dashboard_csv?';
+    const params = [];
     
-    // Hiển thị thông báo
+    if (licensePlate) params.push(`license_plate=${encodeURIComponent(licensePlate)}`);
+    if (fromDate) params.push(`from_date=${fromDate}`);
+    if (toDate) params.push(`to_date=${toDate}`);
+    
+    url += params.join('&');
+    
     showExportMessage('Đang tạo báo cáo CSV...', 'info');
-    
-    // Tải file
     window.location.href = url;
     
-    // Ẩn thông báo sau 3 giây
     setTimeout(() => {
         const message = document.getElementById('export-message');
         if (message) message.remove();
@@ -162,21 +212,22 @@ function exportToCSV() {
 }
 
 function exportToPDF() {
+    const licensePlate = document.getElementById('license_plate').value;
     const fromDate = document.getElementById('from_date').value;
     const toDate = document.getElementById('to_date').value;
     
-    let url = '/export_dashboard_pdf';
-    if (fromDate && toDate) {
-        url += `?from_date=${fromDate}&to_date=${toDate}`;
-    }
+    let url = '/export_dashboard_pdf?';
+    const params = [];
     
-    // Hiển thị thông báo
+    if (licensePlate) params.push(`license_plate=${encodeURIComponent(licensePlate)}`);
+    if (fromDate) params.push(`from_date=${fromDate}`);
+    if (toDate) params.push(`to_date=${toDate}`);
+    
+    url += params.join('&');
+    
     showExportMessage('Đang tạo báo cáo PDF...', 'info');
-    
-    // Tải file
     window.location.href = url;
     
-    // Ẩn thông báo sau 3 giây
     setTimeout(() => {
         const message = document.getElementById('export-message');
         if (message) message.remove();
@@ -187,11 +238,8 @@ function showExportMessage(message, type) {
     const alertClass = type === 'error' ? 'alert-danger' : 'alert-info';
     const messageId = 'export-message';
     
-    // Remove existing message
     const existingMessage = document.getElementById(messageId);
-    if (existingMessage) {
-        existingMessage.remove();
-    }
+    if (existingMessage) existingMessage.remove();
     
     const messageHtml = `
         <div id="${messageId}" class="alert ${alertClass} alert-dismissible fade show" role="alert">
@@ -200,32 +248,24 @@ function showExportMessage(message, type) {
         </div>
     `;
     
-    // Add message before the table
     const table = document.querySelector('.table-responsive');
     if (table) {
         table.insertAdjacentHTML('beforebegin', messageHtml);
-    } else {
-        const cardBody = document.querySelector('.card-body');
-        if (cardBody) {
-            cardBody.insertAdjacentHTML('afterbegin', messageHtml);
-        }
     }
 }
 
-// Tự động set date mặc định nếu chưa có
+// Auto set default dates
 document.addEventListener('DOMContentLoaded', function() {
     const fromDate = document.getElementById('from_date');
     const toDate = document.getElementById('to_date');
     
     if (fromDate && !fromDate.value) {
-        // Mặc định 30 ngày trước
         const defaultFromDate = new Date();
         defaultFromDate.setDate(defaultFromDate.getDate() - 30);
         fromDate.value = defaultFromDate.toISOString().split('T')[0];
     }
     
     if (toDate && !toDate.value) {
-        // Mặc định hôm nay
         toDate.value = new Date().toISOString().split('T')[0];
     }
 });
