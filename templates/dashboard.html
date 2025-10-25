@@ -10,75 +10,84 @@
                 <h4 class="mb-0"><i class="fas fa-chart-line"></i> Dashboard & Báo cáo</h4>
             </div>
             <div class="card-body">
-                <!-- Statistics -->
-                <!-- Statistics -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="stat-box text-center">
-            <div class="stat-title">Xe đang trong bãi</div>
-            <div class="stat-value">{{ active_sessions }}</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-box text-center">
-            <div class="stat-title">Tổng lượt gửi</div>
-            <div class="stat-value">{{ total_sessions }}</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-box text-center">
-            <div class="stat-title">Tổng doanh thu</div>
-            <div class="stat-value">{{ "%.0f"|format(total_revenue) }} VND</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-box text-center">
-            <div class="stat-title">Doanh thu (khoảng thời gian)</div>
-            <div class="stat-value">{{ "%.0f"|format(filtered_revenue) }} VND</div>
-        </div>
-    </div>
-</div>
-
-<!-- Date Filter và Search -->
-<div class="card mb-4">
-    <div class="card-body">
-        <h5 class="card-title">Bộ lọc thời gian & Tìm kiếm</h5>
-        <form method="GET" action="{{ url_for('dashboard') }}">
-            <div class="row">
-                <div class="col-md-3">
-                    <label for="license_plate" class="form-label">Tìm theo biển số</label>
-                    <input type="text" class="form-control" id="license_plate" name="license_plate" 
-                           value="{{ license_plate }}" placeholder="Nhập biển số xe...">
-                </div>
-                <div class="col-md-3">
-                    <label for="from_date" class="form-label">Từ ngày</label>
-                    <input type="date" class="form-control" id="from_date" name="from_date" 
-                           value="{{ from_date }}">
-                </div>
-                <div class="col-md-3">
-                    <label for="to_date" class="form-label">Đến ngày</label>
-                    <input type="date" class="form-control" id="to_date" name="to_date" 
-                           value="{{ to_date }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">&nbsp;</label>
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-filter"></i> Lọc & Tìm
-                        </button>
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-refresh"></i> Reset
-                        </a>
+                <!-- Xe đang gửi để đầu -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="stat-box text-center">
+                            <div class="stat-title">Xe đang trong bãi</div>
+                            <div class="stat-value">{{ active_sessions }}</div>
+                            <div class="stat-update">Thời gian thực</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </form>
-    </div>
-</div>
 
-                
+                <!-- Date Filter và Search -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Bộ lọc thời gian & Tìm kiếm</h5>
+                        <form method="GET" action="{{ url_for('dashboard') }}">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="license_plate" class="form-label">Tìm theo biển số</label>
+                                    <input type="text" class="form-control" id="license_plate" name="license_plate" 
+                                           value="{{ license_plate }}" placeholder="Nhập biển số xe...">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="from_date" class="form-label">Từ ngày</label>
+                                    <input type="date" class="form-control" id="from_date" name="from_date" 
+                                           value="{{ from_date }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="to_date" class="form-label">Đến ngày</label>
+                                    <input type="date" class="form-control" id="to_date" name="to_date" 
+                                           value="{{ to_date }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-filter"></i> Lọc & Tìm
+                                        </button>
+                                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-refresh"></i> Reset
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
 
-                
+                <!-- Tổng lượt gửi và Doanh thu để dưới bộ lọc -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="stat-box text-center">
+                            <div class="stat-title">Tổng lượt gửi</div>
+                            <div class="stat-value">{{ total_sessions }}</div>
+                            <div class="stat-update">Trong khoảng thời gian</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="stat-box text-center">
+                            <div class="stat-title">Doanh thu</div>
+                            <div class="stat-value">{{ "%.0f"|format(filtered_revenue) }} VND</div>
+                            <div class="stat-update">Trong khoảng thời gian</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hiển thị kết quả tìm kiếm -->
+                {% if license_plate or from_date or to_date %}
+                <div class="alert alert-info mb-4">
+                    <i class="fas fa-filter"></i>
+                    <strong>Kết quả tìm kiếm:</strong>
+                    {% if license_plate %} Biển số chứa: <strong>"{{ license_plate }}"</strong> {% endif %}
+                    {% if from_date %} | Từ: <strong>{{ from_date }}</strong> {% endif %}
+                    {% if to_date %} | Đến: <strong>{{ to_date }}</strong> {% endif %}
+                    | Tìm thấy: <strong>{{ total_sessions }}</strong> lượt gửi
+                    {% if filtered_revenue > 0 %} | Doanh thu: <strong>{{ "%.0f"|format(filtered_revenue) }} VND</strong> {% endif %}
+                </div>
+                {% endif %}
 
                 <!-- Sessions Table -->
                 <h5 class="mb-3">Lịch sử gửi xe</h5>

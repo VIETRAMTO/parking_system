@@ -95,12 +95,12 @@ def home():
     conn = get_db_connection()
     available_slots = conn.execute("SELECT COUNT(*) FROM ParkingSlot WHERE status = 'available'").fetchone()[0]
     occupied_slots = conn.execute("SELECT COUNT(*) FROM ParkingSession WHERE status = 'in_progress'").fetchone()[0]
-    config = conn.execute("SELECT name, address, managing_agency, total_slots, price_per_hour FROM SystemConfig WHERE id = 1").fetchone()
+    total_slots = conn.execute("SELECT COUNT(*) FROM ParkingSlot").fetchone()[0]
+    config = conn.execute("SELECT name, address, managing_agency, price_per_hour FROM SystemConfig WHERE id = 1").fetchone()
     
     name = config['name'] if config and config['name'] else "Bãi xe Trung tâm"
     address = config['address'] if config and config['address'] else "123 Đường ABC, Quận 1, TP.HCM"
     managing_agency = config['managing_agency'] if config and config['managing_agency'] else "Sở Giao thông Vận tải TP.HCM"
-    total_slots = config['total_slots'] if config else 100
     price_per_hour = config['price_per_hour'] if config else 5000
     conn.close()
     
@@ -160,7 +160,6 @@ def login():
             flash('Sai tên đăng nhập hoặc mật khẩu', 'error')
     
     return render_template('login.html')
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -173,6 +172,15 @@ def register():
         role = request.form['role']
         license_plate = request.form.get('license_plate', '')
         vehicle_type = request.form.get('vehicle_type', 'sedan')
+        
+        # SỬA: Kiểm tra biển số xe bắt buộc cho customer
+        if role == 'customer':
+            if not license_plate:
+                flash('Biển số xe là bắt buộc cho khách hàng.', 'error')
+                return render_template('register.html')
+            if not validate_license_plate(license_plate):
+                flash('Biển số xe không hợp lệ. Định dạng: XXA-XXX.XX', 'error')
+                return render_template('register.html')
         
         if role == 'admin':
             if 'role' in session and session['role'] == 'admin':
@@ -193,10 +201,13 @@ def register():
                 "INSERT INTO User (user_id, username, password, role, full_name, phone, email, balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (user_id, username, hash_password(password), role, full_name, phone, email or None, 0.0)
             )
+            
+            # SỬA: Chỉ thêm vehicle cho customer có biển số hợp lệ
             if role == 'customer' and license_plate and validate_license_plate(license_plate):
                 vehicle_id = str(uuid.uuid4())
                 conn.execute("INSERT INTO Vehicle (vehicle_id, license_plate, vehicle_type, owner_id) VALUES (?, ?, ?, ?)",
                             (vehicle_id, license_plate, vehicle_type, user_id))
+            
             conn.commit()
             flash('Đăng ký thành công!', 'success')
             return redirect(url_for('login'))
@@ -206,7 +217,6 @@ def register():
             conn.close()
     
     return render_template('register.html')
-
 @app.route('/logout')
 def logout():
     session.clear()
@@ -216,20 +226,30 @@ def logout():
 @app.route('/vehicle_entry', methods=['GET', 'POST'])
 @login_required(role=['admin', 'operator'])
 def vehicle_entry():
+    conn = get_db_connection()
+    
+    # Lấy danh sách chỗ đỗ trống (bỏ sắp xếp theo distance)
+    available_slots = conn.execute("""
+        SELECT slot_id, slot_number, location
+        FROM ParkingSlot 
+        WHERE status = 'available' 
+        ORDER BY slot_number ASC 
+    """).fetchall()
+    
     if request.method == 'POST':
         license_plate = request.form['license_plate']
         vehicle_type = request.form['vehicle_type']
         owner_username = request.form.get('owner_username', '')
+        slot_id = request.form['slot_id']
         
         if not license_plate:
             flash('Vui lòng nhập biển số xe.', 'error')
-            return render_template('vehicle_entry.html')
+            return render_template('vehicle_entry.html', available_slots=available_slots)
         
         if not validate_license_plate(license_plate):
             flash('Biển số xe không hợp lệ.', 'error')
-            return render_template('vehicle_entry.html')
+            return render_template('vehicle_entry.html', available_slots=available_slots)
         
-        conn = get_db_connection()
         vehicle = conn.execute("SELECT vehicle_id FROM Vehicle WHERE license_plate = ?", (license_plate,)).fetchone()
         
         if not vehicle:
@@ -243,22 +263,25 @@ def vehicle_entry():
         
         session_id = str(uuid.uuid4())
         entry_time = datetime.now()
-        slot = conn.execute("SELECT slot_id, slot_number FROM ParkingSlot WHERE status = 'available' LIMIT 1").fetchone()
-        slot_id = slot['slot_id'] if slot else None
+        
+        # Lấy thông tin chỗ đỗ được chọn
+        slot = conn.execute("SELECT slot_id, slot_number FROM ParkingSlot WHERE slot_id = ?", (slot_id,)).fetchone()
         slot_number = slot['slot_number'] if slot else None
         
         conn.execute("INSERT INTO ParkingSession (session_id, vehicle_id, entry_time, status, slot_id) VALUES (?, ?, ?, ?, ?)",
                      (session_id, vehicle_id, entry_time, 'in_progress', slot_id))
+        
         if slot_id:
             conn.execute("UPDATE ParkingSlot SET status = 'occupied' WHERE slot_id = ?", (slot_id,))
         
         conn.commit()
         conn.close()
         
-        flash(f'Xe {license_plate} vào bãi lúc {entry_time}. (Chỗ đỗ: {slot_number if slot else "Chưa gán"})', 'success')
+        flash(f'Xe {license_plate} vào bãi lúc {entry_time}. Chỗ đỗ: {slot_number}', 'success')
         return redirect(url_for('vehicle_entry'))
     
-    return render_template('vehicle_entry.html')
+    conn.close()
+    return render_template('vehicle_entry.html', available_slots=available_slots)
 
 @app.route('/vehicle_exit', methods=['GET', 'POST'])
 @login_required(role=['admin', 'operator'])
@@ -710,39 +733,53 @@ def configure_system():
     if request.method == 'POST':
         if 'general_config' in request.form:
             parking_lot_name = request.form['parking_lot_name']
-            slots = int(request.form['slots'])
+            managing_agency = request.form['managing_agency']
+            address = request.form['address']
             
             if not parking_lot_name:
                 flash('Vui lòng nhập tên bãi xe.', 'error')
+                conn.close()
                 return redirect(url_for('configure_system'))
             
             try:
                 current_config = conn.execute("SELECT price_per_hour FROM SystemConfig WHERE id = 1").fetchone()
                 current_price = current_config['price_per_hour'] if current_config else 5000
-                conn.execute("INSERT OR REPLACE INTO SystemConfig (id, name, total_slots, price_per_hour) VALUES (?, ?, ?, ?)",
-                             (1, parking_lot_name, slots, current_price))
+                
+               
+                conn.execute("""
+                    INSERT OR REPLACE INTO SystemConfig 
+                    (id, name, managing_agency, address, price_per_hour) 
+                    VALUES (?, ?, ?, ?, ?)
+                """, (1, parking_lot_name, managing_agency, address, current_price))
                 conn.commit()
                 flash('Cấu hình chung đã được lưu!', 'success')
-            except sqlite3.Error:
-                flash('Lỗi khi lưu cấu hình.', 'error')
+            except sqlite3.Error as e:
+                flash(f'Lỗi khi lưu cấu hình: {e}', 'error')
         
         elif 'price_config' in request.form:
             price_per_hour = float(request.form['price_per_hour'])
             
             try:
-                current_config = conn.execute("SELECT name, total_slots FROM SystemConfig WHERE id = 1").fetchone()
+                current_config = conn.execute("SELECT name, managing_agency, address FROM SystemConfig WHERE id = 1").fetchone()
                 current_name = current_config['name'] if current_config else "Bãi xe Trung tâm"
-                current_slots = current_config['total_slots'] if current_config else 100
-                conn.execute("INSERT OR REPLACE INTO SystemConfig (id, name, total_slots, price_per_hour) VALUES (?, ?, ?, ?)",
-                             (1, current_name, current_slots, price_per_hour))
+                current_agency = current_config['managing_agency'] if current_config else "Sở Giao thông Vận tải TP.HCM"
+                current_address = current_config['address'] if current_config else "123 Đường ABC, Quận 1, TP.HCM"
+                
+               
+                conn.execute("""
+                    INSERT OR REPLACE INTO SystemConfig 
+                    (id, name, managing_agency, address, price_per_hour) 
+                    VALUES (?, ?, ?, ?, ?)
+                """, (1, current_name, current_agency, current_address, price_per_hour))
                 conn.commit()
                 flash('Giá phí đã được lưu!', 'success')
-            except sqlite3.Error:
-                flash('Lỗi khi lưu giá phí.', 'error')
+            except sqlite3.Error as e:
+                flash(f'Lỗi khi lưu giá phí: {e}', 'error')
     
     # Handle user search
     user_search = request.args.get('user_search', '')
     active_tab = request.args.get('tab', 'general')
+    
     if user_search:
         users = conn.execute("""
             SELECT user_id, username, role, full_name, phone, email, balance 
@@ -753,7 +790,8 @@ def configure_system():
     else:
         users = conn.execute("SELECT user_id, username, role, full_name, phone, email, balance FROM User ORDER BY username").fetchall()
     
-    config = conn.execute("SELECT name, total_slots, price_per_hour FROM SystemConfig WHERE id = 1").fetchone()
+   
+    config = conn.execute("SELECT name, managing_agency, address, price_per_hour FROM SystemConfig WHERE id = 1").fetchone()
     slots = conn.execute("SELECT slot_id, slot_number, status, location FROM ParkingSlot ORDER BY slot_number").fetchall()
     devices = conn.execute("SELECT device_id, device_type, device_status, location FROM Device").fetchall()
     
@@ -764,7 +802,7 @@ def configure_system():
                          slots=slots, 
                          devices=devices,
                          user_search=user_search,
-                        active_tab=active_tab)
+                         active_tab=active_tab)
 @app.route('/dashboard')
 @login_required(role=['admin', 'operator'])
 def dashboard():
@@ -936,22 +974,30 @@ def vnpay_return():
     if trans and secure_hash == calculated_hash and response_code == '00':
         user_id = trans['user_id']
         user = conn.execute("SELECT balance FROM User WHERE user_id = ?", (user_id,)).fetchone()
-        new_balance = user['balance'] + amount
-        conn.execute("UPDATE PaymentTransaction SET status = 'completed', transaction_time = ? WHERE transaction_code = ?",
-                     (datetime.now(), txn_ref))
-        conn.execute("UPDATE User SET balance = ? WHERE user_id = ?", (new_balance, user_id))
-        conn.commit()
-        flash(f'Thanh toán thành công! Đã nạp {amount:,.0f} VND. Số dư mới: {new_balance:,.0f} VND', 'success')
+        
+        # SỬA: Kiểm tra user có tồn tại không
+        if user:  # THÊM ĐIỀU KIỆN KIỂM TRA
+            new_balance = user['balance'] + amount
+            conn.execute("UPDATE PaymentTransaction SET status = 'completed', transaction_time = ? WHERE transaction_code = ?",
+                         (datetime.now(), txn_ref))
+            conn.execute("UPDATE User SET balance = ? WHERE user_id = ?", (new_balance, user_id))
+            conn.commit()
+            flash(f'Thanh toán thành công! Đã nạp {amount:,.0f} VND. Số dư mới: {new_balance:,.0f} VND', 'success')
+        else:
+            # Xử lý trường hợp không tìm thấy user
+            conn.execute("UPDATE PaymentTransaction SET status = 'failed', transaction_time = ? WHERE transaction_code = ?",
+                         (datetime.now(), txn_ref))
+            conn.commit()
+            flash('Lỗi: Không tìm thấy thông tin người dùng. Vui lòng liên hệ quản trị viên.', 'error')
     else:
         if trans:
             conn.execute("UPDATE PaymentTransaction SET status = 'failed' WHERE transaction_code = ?", (txn_ref,))
             conn.commit()
         flash(f'Thanh toán thất bại. Mã lỗi: {response_code or "Không có mã lỗi"}', 'error')
+    
     conn.close()
     
     return redirect(url_for('recharge'))
-
-
 # ANPR endpoint
 @app.route('/recognize_license_plate', methods=['POST'])
 def recognize_license_plate_endpoint():
@@ -1643,4 +1689,5 @@ def export_dashboard_pdf():
 
 
 if __name__ == '__main__':
+    
     app.run(debug=True, host='0.0.0.0', port=5000)

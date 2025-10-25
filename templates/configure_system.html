@@ -44,71 +44,88 @@
 
                     <!-- Tab Content -->
                     <div class="tab-content" id="configTabsContent">
-                        <!-- Tab 1: General Configuration -->
-                        <div class="tab-pane fade show active" id="general" role="tabpanel">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header bg-info text-white">
-                                            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Thông Tin Bãi Xe</h5>
-                                        </div>
-                                        <div class="card-body">
-                                            <form method="POST" action="{{ url_for('configure_system') }}">
-                                                <input type="hidden" name="general_config" value="1">
-                                                <div class="mb-3">
-                                                    <label for="parking_lot_name" class="form-label">Tên Bãi Xe *</label>
-                                                    <input type="text" class="form-control" id="parking_lot_name" name="parking_lot_name" 
-                                                           value="{{ config.name if config else '' }}" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="slots" class="form-label">Tổng Số Chỗ Đỗ *</label>
-                                                    <input type="number" class="form-control" id="slots" name="slots" 
-                                                           value="{{ config.total_slots if config else 100 }}" min="1" required>
-                                                </div>
-                                                <button type="submit" class="btn btn-primary">
-                                                    <i class="fas fa-save me-2"></i>Lưu Cấu Hình
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header bg-success text-white">
-                                            <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Thống Kê Hiện Tại</h5>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="row text-center">
-                                                <div class="col-6 mb-3">
-                                                    <div class="p-3 bg-light rounded">
-                                                        <h4 class="text-primary mb-1">{{ users|length }}</h4>
-                                                        <small class="text-muted">Tổng Người Dùng</small>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6 mb-3">
-                                                    <div class="p-3 bg-light rounded">
-                                                        <h4 class="text-success mb-1">{{ slots|length }}</h4>
-                                                        <small class="text-muted">Tổng Chỗ Đỗ</small>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="p-3 bg-light rounded">
-                                                        <h4 class="text-warning mb-1">{{ devices|length }}</h4>
-                                                        <small class="text-muted">Thiết Bị</small>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="p-3 bg-light rounded">
-                                                        <h4 class="text-info mb-1">{{ "%.0f"|format(config.price_per_hour) if config else 5000 }}</h4>
-                                                        <small class="text-muted">Giá/Giờ (VND)</small>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                       <!-- Tab 1: General Configuration -->
+<div class="tab-pane fade show active" id="general" role="tabpanel">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-building me-2"></i>Thông Tin Bãi Xe</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('configure_system') }}">
+                        <input type="hidden" name="general_config" value="1">
+                        <div class="mb-3">
+                            <label for="parking_lot_name" class="form-label">Tên Bãi Xe *</label>
+                            <input type="text" class="form-control" id="parking_lot_name" name="parking_lot_name" 
+                                   value="{{ config.name if config else '' }}" 
+                                   placeholder="Nhập tên bãi xe" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="managing_agency" class="form-label">Cơ Quan Quản Lý *</label>
+                            <input type="text" class="form-control" id="managing_agency" name="managing_agency" 
+                                   value="{{ config.managing_agency if config and config.managing_agency else '' }}" 
+                                   placeholder="VD: Sở Giao thông Vận tải TP.HCM" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Địa Chỉ *</label>
+                            <textarea class="form-control" id="address" name="address" 
+                                      rows="3" placeholder="Nhập địa chỉ đầy đủ của bãi xe" required>{{ config.address if config and config.address else '' }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Lưu Cấu Hình
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Thống Kê Hiện Tại</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="p-3 bg-light rounded">
+                                <h4 class="text-primary mb-1">{{ users|length }}</h4>
+                                <small class="text-muted">Tổng Người Dùng</small>
                             </div>
                         </div>
+                        <div class="col-6 mb-3">
+                            <div class="p-3 bg-light rounded">
+                                <h4 class="text-success mb-1">{{ slots|length }}</h4>
+                                <small class="text-muted">Tổng Chỗ Đỗ</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded">
+                                <h4 class="text-warning mb-1">{{ devices|length }}</h4>
+                                <small class="text-muted">Thiết Bị</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded">
+                                <h4 class="text-info mb-1">{{ "%.0f"|format(config.price_per_hour) if config else 5000 }}</h4>
+                                <small class="text-muted">Giá/Giờ (VND)</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Thông tin hiện tại -->
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <h6 class="text-dark mb-3"><i class="fas fa-info-circle me-2"></i>Thông Tin Hiện Tại</h6>
+                        <div class="small">
+                            <p class="mb-1"><strong>Tên bãi xe:</strong> {{ config.name if config else 'Chưa cấu hình' }}</p>
+                            <p class="mb-1"><strong>Cơ quan quản lý:</strong> {{ config.managing_agency if config and config.managing_agency else 'Chưa cấu hình' }}</p>
+                            <p class="mb-0"><strong>Địa chỉ:</strong> {{ config.address if config and config.address else 'Chưa cấu hình' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
                         <!-- Tab 2: Price Configuration -->
                         <div class="tab-pane fade" id="price" role="tabpanel">

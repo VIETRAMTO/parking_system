@@ -82,6 +82,29 @@
                                 <input type="text" class="form-control" id="owner_username" name="owner_username" 
                                        placeholder="Nhập tên đăng nhập chủ xe">
                             </div>
+
+                            <!-- THÊM: Dropdown chọn chỗ đỗ thủ công -->
+                            <div class="mb-3">
+                                <label for="slot_id" class="form-label">Chọn chỗ đỗ *</label>
+                                <select class="form-control" id="slot_id" name="slot_id" required>
+                                    <option value="">-- Chọn chỗ đỗ --</option>
+                                    {% for slot in available_slots %}
+                                    <option value="{{ slot.slot_id }}">
+                                        {{ slot.slot_number }} - {{ slot.location or 'Chưa có mô tả' }}
+                                        {% if slot.distance_from_entry %}
+                                        ({{ slot.distance_from_entry }}m từ cổng)
+                                        {% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">
+                                    {% if available_slots %}
+                                    Có {{ available_slots|length }} chỗ trống
+                                    {% else %}
+                                    <span class="text-danger">Không có chỗ trống!</span>
+                                    {% endif %}
+                                </small>
+                            </div>
                         </div>
                         
                         <div class="col-md-6">
@@ -195,11 +218,19 @@
                         </div>
                     </div>
                     
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">
+                    <div class="d-grid mt-3">
+                        <button type="submit" class="btn btn-primary btn-lg" {% if not available_slots %}disabled{% endif %}>
                             <i class="fas fa-check-circle"></i> Xác nhận vào bãi
                         </button>
                     </div>
+
+                    <!-- Hiển thị thông báo nếu không có chỗ trống -->
+                    {% if not available_slots %}
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Bãi xe đã đầy!</strong> Hiện không có chỗ đỗ trống. Vui lòng chờ xe ra hoặc thêm chỗ đỗ mới.
+                    </div>
+                    {% endif %}
                 </form>
             </div>
         </div>
@@ -225,8 +256,6 @@ function fetchPriceConfiguration() {
         .then(data => {
             if (data.price_per_hour) {
                 currentPricePerHour = data.price_per_hour;
-                document.getElementById('info-price-per-hour').textContent = 
-                    formatNumber(currentPricePerHour) + ' VND/giờ';
             }
         })
         .catch(error => {
@@ -344,6 +373,16 @@ function formatDateTime(date) {
     return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN');
 }
 
+// Format date
+function formatDate(date) {
+    return date.toLocaleDateString('vi-VN');
+}
+
+// Format number with commas
+function formatNumber(num) {
+    return new Intl.NumberFormat('vi-VN').format(num);
+}
+
 // Get vehicle type name
 function getVehicleTypeName(type) {
     const types = {
@@ -360,6 +399,31 @@ function getVehicleTypeName(type) {
 function validateLicensePlate(plate) {
     const pattern = /^\d{2}[A-Z]-\d{3}\.\d{2}$/;
     return pattern.test(plate);
+}
+
+// Select slot from the list
+function selectSlot(slotId) {
+    document.getElementById('slot_id').value = slotId;
+    showToast('Đã chọn chỗ đỗ', 'success');
+}
+
+// Show toast message
+function showToast(message, type) {
+    // Simple toast implementation
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 250px;';
+    toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
 }
 
 // Webcam functionality

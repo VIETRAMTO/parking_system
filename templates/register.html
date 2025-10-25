@@ -53,15 +53,18 @@
                                 <input type="password" class="form-control" id="admin_code" name="admin_code" 
                                        placeholder="Nhập mã admin để đăng ký vai trò admin">
                             </div>
-                            <div class="mb-3">
-                                <label for="license_plate" class="form-label">Biển số xe</label>
+                            
+                            <!-- SỬA: Biển số xe thành bắt buộc cho customer -->
+                            <div class="mb-3" id="licensePlateField">
+                                <label for="license_plate" class="form-label">Biển số xe *</label>
                                 <input type="text" class="form-control" id="license_plate" name="license_plate" 
                                        placeholder="VD: 51A-123.45" pattern="\d{2}[A-Z]-\d{3}\.\d{2}">
-                                <small class="form-text text-muted">Định dạng: XXA-XXX.XX</small>
+                                <small class="form-text text-muted">Định dạng: XXA-XXX.XX (Bắt buộc cho khách hàng)</small>
                             </div>
-                            <div class="mb-3">
-                                <label for="vehicle_type" class="form-label">Loại xe</label>
-                                <select class="form-control" id="vehicle_type" name="vehicle_type">
+                            
+                            <div class="mb-3" id="vehicleTypeField">
+                                <label for="vehicle_type" class="form-label">Loại xe *</label>
+                                <select class="form-control" id="vehicle_type" name="vehicle_type" required>
                                     <option value="sedan">Sedan</option>
                                     <option value="suv">SUV</option>
                                     <option value="truck">Truck</option>
@@ -89,13 +92,45 @@
 <script>
 document.getElementById('role').addEventListener('change', function() {
     const adminCodeField = document.getElementById('adminCodeField');
+    const licensePlateField = document.getElementById('licensePlateField');
+    const vehicleTypeField = document.getElementById('vehicleTypeField');
+    const licensePlateInput = document.getElementById('license_plate');
+    const vehicleTypeSelect = document.getElementById('vehicle_type');
+    
     if (this.value === 'admin') {
         adminCodeField.style.display = 'block';
         document.getElementById('admin_code').required = true;
-    } else {
+        
+        // Ẩn biển số xe và loại xe cho admin
+        licensePlateField.style.display = 'none';
+        vehicleTypeField.style.display = 'none';
+        licensePlateInput.required = false;
+        vehicleTypeSelect.required = false;
+    } else if (this.value === 'operator') {
         adminCodeField.style.display = 'none';
         document.getElementById('admin_code').required = false;
+        
+        // Ẩn biển số xe và loại xe cho operator
+        licensePlateField.style.display = 'none';
+        vehicleTypeField.style.display = 'none';
+        licensePlateInput.required = false;
+        vehicleTypeSelect.required = false;
+    } else {
+        // customer
+        adminCodeField.style.display = 'none';
+        document.getElementById('admin_code').required = false;
+        
+        // Hiện biển số xe và loại xe cho customer (bắt buộc)
+        licensePlateField.style.display = 'block';
+        vehicleTypeField.style.display = 'block';
+        licensePlateInput.required = true;
+        vehicleTypeSelect.required = true;
     }
+});
+
+// Kích hoạt sự kiện change khi trang load để set trạng thái ban đầu
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('role').dispatchEvent(new Event('change'));
 });
 </script>
 {% endblock %}
